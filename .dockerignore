@@ -1,0 +1,42 @@
+# Dependências e artefatos de build (reinstalados/gerados dentro da imagem)
+node_modules
+dist
+web-build
+*.tsbuildinfo
+
+# Expo / nativo (gerados pelo Expo, nunca copiados para a imagem)
+.expo
+expo-env.d.ts
+ios
+android
+.metro-health-check*
+
+# Git e metadados de CI
+.git
+.gitignore
+.github
+.gitattributes
+
+# Ambiente (injetado em build/runtime, nunca copiado para a imagem)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Editores, SO e agentes
+.vscode
+.idea
+.claude
+.DS_Store
+*.swp
+
+# Docker e docs
+Dockerfile*
+.dockerignore
+README.md
+AGENTS.md
