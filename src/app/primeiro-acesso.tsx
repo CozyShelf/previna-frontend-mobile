@@ -9,7 +9,7 @@ import { Opcoes, type Opcao } from '@/components/opcoes';
 import { Tela } from '@/components/tela';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
 import { ApiError, put } from '@/lib/api';
-import { obterToken } from '@/lib/sessao';
+import { iniciarSessao, obterToken } from '@/lib/sessao';
 
 const TEXTO_CONSENTIMENTO =
   'Autorizo o Previna a usar meus dados pessoais e de saúde para acompanhar meu pré-natal, conforme a Lei Geral de Proteção de Dados (Lei nº 13.709/2018).';
@@ -62,6 +62,9 @@ function erroLogin(login: string) {
   }
   if (login.length < 4) {
     return 'O login deve ter pelo menos 4 caracteres.';
+  }
+  if (!/[A-Za-z]/.test(login)) {
+    return 'O login precisa ter pelo menos uma letra.';
   }
 }
 
@@ -146,7 +149,8 @@ export default function PrimeiroAcessoScreen() {
     setErro(undefined);
     setEnviando(true);
     try {
-      await put('/gestantes/primeiro-acesso', {
+      // O token da senha temporária só servia para esta etapa; segue com o novo
+      const { token } = await put<{ token: string }>('/gestantes/primeiro-acesso', {
         novoLogin: novoLogin.trim(),
         novaSenha,
         consentimentoLgpd: consentimento,
@@ -155,6 +159,7 @@ export default function PrimeiroAcessoScreen() {
         escolaridade,
         beneficiariaProgramaSocial: programaSocial === undefined ? undefined : programaSocial === 'sim',
       });
+      iniciarSessao(token);
       router.replace('/tutorial');
     } catch (e) {
       setErro(
@@ -175,7 +180,7 @@ export default function PrimeiroAcessoScreen() {
         <Campo
           ref={refLogin}
           rotulo="Novo login"
-          dica="De 4 a 50 caracteres: letras, números, ponto, hífen ou sublinhado."
+          dica="De 4 a 50 caracteres, com pelo menos uma letra. Pode usar números, ponto, hífen e sublinhado."
           erro={erroDe('login')}
           value={novoLogin}
           onChangeText={setNovoLogin}
