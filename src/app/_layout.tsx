@@ -1,18 +1,44 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import {
+  IBMPlexSans_400Regular,
+  IBMPlexSans_500Medium,
+  IBMPlexSans_600SemiBold,
+} from '@expo-google-fonts/ibm-plex-sans';
+import { Raleway_700Bold } from '@expo-google-fonts/raleway';
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { useEffect, useState } from 'react';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { Cores } from '@/constants/theme';
+import { restaurarSessao } from '@/lib/sessao';
 
 SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
+  const [carregadas, erro] = useFonts({
+    IBMPlexSans_400Regular,
+    IBMPlexSans_500Medium,
+    IBMPlexSans_600SemiBold,
+    Raleway_700Bold,
+  });
+  const [sessaoRestaurada, setSessaoRestaurada] = useState(false);
+  const pronto = (carregadas || erro) && sessaoRestaurada;
+
+  useEffect(() => {
+    restaurarSessao().finally(() => setSessaoRestaurada(true));
+  }, []);
+
+  useEffect(() => {
+    if (pronto) {
+      SplashScreen.hideAsync();
+    }
+  }, [pronto]);
+
+  if (!pronto) {
+    return null;
+  }
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Cores.fundo } }} />
   );
 }

@@ -1,98 +1,105 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect, router } from 'expo-router';
+import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Alerta } from '@/components/alerta';
+import { Botao } from '@/components/botao';
+import { Campo } from '@/components/campo';
+import { Tela } from '@/components/tela';
+import { Espaco } from '@/constants/theme';
+import { ApiError, post } from '@/lib/api';
+import { iniciarSessao, obterToken, perfilDoToken } from '@/lib/sessao';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
+interface TokenResponse {
+  token: string;
+  primeiroAcesso: boolean;
+  tutorialPendente: boolean;
 }
 
-export default function HomeScreen() {
+function destino({ primeiroAcesso, tutorialPendente }: TokenResponse) {
+  if (primeiroAcesso) {
+    return '/primeiro-acesso';
+  }
+  return tutorialPendente ? '/tutorial' : '/inicio';
+}
+
+export default function LoginScreen() {
+  const [login, setLogin] = useState('');
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState<string>();
+  const [enviando, setEnviando] = useState(false);
+
+  if (obterToken()) {
+    return <Redirect href="/inicio" />;
+  }
+
+  async function entrar() {
+    if (!login.trim() || !senha) {
+      setErro('Informe o login e a senha.');
+      return;
+    }
+    setErro(undefined);
+    setEnviando(true);
+    try {
+      const resposta = await post<TokenResponse>('/auth/login', { login: login.trim(), senha });
+      if (perfilDoToken(resposta.token) !== 'GESTANTE') {
+        setErro('Acesso permitido apenas para gestantes.');
+        return;
+      }
+      iniciarSessao(resposta.token);
+      router.replace(destino(resposta));
+    } catch (e) {
+      setErro(
+        e instanceof ApiError && e.status === 401
+          ? 'Login ou senha inválidos.'
+          : 'Não foi possível entrar. Verifique sua conexão e tente novamente.',
+      );
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <Tela
+      titulo="Entrar no Previna"
+      descricao="No primeiro acesso, use o login e a senha temporários que você recebeu do seu médico.">
+      <View style={styles.formulario}>
+        <Campo
+          rotulo="Login"
+          value={login}
+          onChangeText={setLogin}
+          autoComplete="username"
+          textContentType="username"
+          returnKeyType="next"
+          maxLength={50}
+        />
+        <Campo
+          rotulo="Senha"
+          value={senha}
+          onChangeText={setSenha}
+          secureTextEntry
+          autoComplete="current-password"
+          textContentType="password"
+          maxLength={72}
+          returnKeyType="go"
+          onSubmitEditing={entrar}
+        />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        {erro && <Alerta mensagem={erro} />}
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        <Botao
+          rotulo={enviando ? 'Entrando…' : 'Entrar'}
+          estilo="primario"
+          desabilitado={enviando}
+          onPress={entrar}
+        />
+      </View>
+    </Tela>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  formulario: {
+    gap: Espaco.cinco,
   },
 });
