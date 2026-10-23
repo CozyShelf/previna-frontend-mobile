@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { Logo } from '@/components/logo';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
@@ -9,11 +9,13 @@ export interface TelaProps {
   titulo: string;
   descricao: string;
   children: ReactNode;
+  // Nas abas a barra inferior já ocupa a área segura de baixo
+  edges?: Edge[];
 }
 
-export function Tela({ titulo, descricao, children }: TelaProps) {
+export function Tela({ titulo, descricao, children, edges }: TelaProps) {
   return (
-    <SafeAreaView style={styles.area}>
+    <SafeAreaView style={styles.area} edges={edges}>
       {/* Android edge-to-edge não redimensiona a tela com o teclado; no iOS o ScrollView ajusta o inset e rola até o campo */}
       <KeyboardAvoidingView
         style={styles.area}

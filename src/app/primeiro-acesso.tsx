@@ -6,9 +6,11 @@ import { Alerta } from '@/components/alerta';
 import { Botao } from '@/components/botao';
 import { Campo } from '@/components/campo';
 import { Opcoes, type Opcao } from '@/components/opcoes';
+import { anexarFoto, SeletorFoto } from '@/components/seletor-foto';
 import { Tela } from '@/components/tela';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
 import { ApiError, put } from '@/lib/api';
+import { somenteDigitos } from '@/lib/mascaras';
 import { iniciarSessao, obterToken } from '@/lib/sessao';
 
 const TEXTO_CONSENTIMENTO =
@@ -37,10 +39,6 @@ const SIM_NAO: Opcao<'sim' | 'nao'>[] = [
   { valor: 'sim', rotulo: 'Sim' },
   { valor: 'nao', rotulo: 'Não' },
 ];
-
-function somenteDigitos(texto: string) {
-  return texto.replace(/\D/g, '');
-}
 
 // 2500 -> 2.500
 function separarMilhar(digitos: string) {
@@ -115,6 +113,7 @@ export default function PrimeiroAcessoScreen() {
   const [escolaridade, setEscolaridade] = useState<Escolaridade>();
   const [programaSocial, setProgramaSocial] = useState<'sim' | 'nao'>();
   const [consentimento, setConsentimento] = useState(false);
+  const [foto, setFoto] = useState<string | null>();
   const [erro, setErro] = useState<string>();
   const [enviando, setEnviando] = useState(false);
   const [visiveis, setVisiveis] = useState<CampoValidado[]>([]);
@@ -149,16 +148,28 @@ export default function PrimeiroAcessoScreen() {
     setErro(undefined);
     setEnviando(true);
     try {
-      // O token da senha temporária só servia para esta etapa; segue com o novo
-      const { token } = await put<{ token: string }>('/gestantes/primeiro-acesso', {
+      // Vai como multipart por causa da foto; campos opcionais em branco ficam de fora
+      const campos = {
         novoLogin: novoLogin.trim(),
         novaSenha,
-        consentimentoLgpd: consentimento,
-        rendaFamiliar: renda ? Number(renda) : undefined,
-        pessoasDomicilio: pessoas ? Number(pessoas) : undefined,
+        consentimentoLgpd: String(consentimento),
+        rendaFamiliar: renda,
+        pessoasDomicilio: pessoas,
         escolaridade,
-        beneficiariaProgramaSocial: programaSocial === undefined ? undefined : programaSocial === 'sim',
-      });
+        beneficiariaProgramaSocial: programaSocial && String(programaSocial === 'sim'),
+      };
+      const dados = new FormData();
+      for (const [nome, valor] of Object.entries(campos)) {
+        if (valor) {
+          dados.append(nome, valor);
+        }
+      }
+      if (foto) {
+        anexarFoto(dados, 'foto', foto);
+      }
+
+      // O token da senha temporária só servia para esta etapa; segue com o novo
+      const { token } = await put<{ token: string }>('/gestantes/primeiro-acesso', dados);
       iniciarSessao(token);
       router.replace('/tutorial');
     } catch (e) {
@@ -217,6 +228,16 @@ export default function PrimeiroAcessoScreen() {
           textContentType="newPassword"
           maxLength={72}
         />
+
+        <View style={styles.secao}>
+          <Text style={styles.tituloSecao} accessibilityRole="header">
+            Sua foto
+          </Text>
+          <Text style={styles.textoSecao}>
+            Opcional. Aparece no seu perfil e você pode trocar quando quiser.
+          </Text>
+        </View>
+        <SeletorFoto foto={foto} onChange={setFoto} />
 
         <View style={styles.secao}>
           <Text style={styles.tituloSecao} accessibilityRole="header">

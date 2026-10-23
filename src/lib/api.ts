@@ -17,7 +17,8 @@ async function requisicao<T>(caminho: string, init: RequestInit = {}): Promise<T
   const resposta = await fetch(`${API_URL}${caminho}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      // FormData (upload) leva o próprio Content-Type, com o separador do multipart
+      ...(!(init.body instanceof FormData) && { 'Content-Type': 'application/json' }),
       ...(token && { Authorization: `Bearer ${token}` }),
     },
   });
@@ -34,10 +35,24 @@ async function requisicao<T>(caminho: string, init: RequestInit = {}): Promise<T
   return json;
 }
 
+export function get<T>(caminho: string) {
+  return requisicao<T>(caminho);
+}
+
 export function post<T>(caminho: string, corpo: unknown) {
   return requisicao<T>(caminho, { method: 'POST', body: JSON.stringify(corpo) });
 }
 
 export function put<T>(caminho: string, corpo: unknown) {
-  return requisicao<T>(caminho, { method: 'PUT', body: JSON.stringify(corpo) });
+  const body = corpo instanceof FormData ? corpo : JSON.stringify(corpo);
+  return requisicao<T>(caminho, { method: 'PUT', body });
+}
+
+// Imagem protegida da API (ex.: foto da gestante): o expo-image envia o token no cabeçalho
+export function imagemDaApi(caminho: string) {
+  const token = obterToken();
+  return {
+    uri: `${API_URL}${caminho}`,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  };
 }
