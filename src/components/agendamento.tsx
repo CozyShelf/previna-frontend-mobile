@@ -47,9 +47,8 @@ export function CartaoAgendamento({ agendamento }: CartaoAgendamentoProps) {
       {agendamento.observacao ? (
         <Text style={styles.observacao}>{agendamento.observacao}</Text>
       ) : null}
-      {agendamento.status === 'REALIZADO' ? (
-        <Text style={styles.pontos}>{agendamento.pontosBase} pontos creditados</Text>
-      ) : null}
+      {/* O valor creditado é pontosBase x fator de ponderação, e a API não devolve esse número por
+          agendamento: mostrar pontosBase aqui mentiria assim que o fator deixar de ser 1,00. */}
     </View>
   );
 }
@@ -99,10 +98,5 @@ const styles = StyleSheet.create({
     fontFamily: Fontes.regular,
     fontSize: 14,
     color: Cores.textoSecundario,
-  },
-  pontos: {
-    fontFamily: Fontes.media,
-    fontSize: 14,
-    color: '#047857',
   },
 });
