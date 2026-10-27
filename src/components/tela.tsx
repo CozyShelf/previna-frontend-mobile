@@ -11,9 +11,11 @@ export interface TelaProps {
   children: ReactNode;
   // Nas abas a barra inferior já ocupa a área segura de baixo
   edges?: Edge[];
+  // Listas começam no topo; as telas de autenticação seguem centralizadas
+  alinharTopo?: boolean;
 }
 
-export function Tela({ titulo, descricao, children, edges }: TelaProps) {
+export function Tela({ titulo, descricao, children, edges, alinharTopo }: TelaProps) {
   return (
     <SafeAreaView style={styles.area} edges={edges}>
       {/* Android edge-to-edge não redimensiona a tela com o teclado; no iOS o ScrollView ajusta o inset e rola até o campo */}
@@ -21,7 +23,7 @@ export function Tela({ titulo, descricao, children, edges }: TelaProps) {
         style={styles.area}
         behavior={Platform.OS === 'android' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, alinharTopo && styles.noTopo]}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets>
           <View style={styles.coluna}>
@@ -49,6 +51,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: Espaco.seis,
+  },
+  noTopo: {
+    justifyContent: 'flex-start',
   },
   coluna: {
     width: '100%',
