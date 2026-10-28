@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Switch, Text, View, type TextInputInstance } from 'react-native';
 
 import { Alerta } from '@/components/alerta';
 import { Botao } from '@/components/botao';
@@ -117,10 +117,10 @@ export default function PrimeiroAcessoScreen() {
   const [erro, setErro] = useState<string>();
   const [enviando, setEnviando] = useState(false);
   const [visiveis, setVisiveis] = useState<CampoValidado[]>([]);
-  const refLogin = useRef<TextInput>(null);
-  const refSenha = useRef<TextInput>(null);
-  const refConfirmacao = useRef<TextInput>(null);
-  const refPessoas = useRef<TextInput>(null);
+  const refLogin = useRef<TextInputInstance>(null);
+  const refSenha = useRef<TextInputInstance>(null);
+  const refConfirmacao = useRef<TextInputInstance>(null);
+  const refPessoas = useRef<TextInputInstance>(null);
 
   if (!obterToken()) {
     return <Redirect href="/" />;
