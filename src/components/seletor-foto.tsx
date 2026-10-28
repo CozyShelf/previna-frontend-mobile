@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { Image, type ImageSource } from 'expo-image';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,9 +19,9 @@ const OPCOES: ImagePicker.ImagePickerOptions = {
   cameraType: ImagePicker.CameraType.front,
 };
 
-// Foto nova vai como arquivo no multipart; o tipo do FormData (do DOM) não conhece o arquivo por uri do React Native
+// Foto nova vai como arquivo no multipart; o fetch do Expo só aceita File/Blob, não o { uri } do React Native
 export function anexarFoto(dados: FormData, campo: string, uri: string) {
-  dados.append(campo, { uri, name: 'foto.jpg', type: 'image/jpeg' } as unknown as Blob);
+  dados.append(campo, new File(uri));
 }
 
 export interface SeletorFotoProps {

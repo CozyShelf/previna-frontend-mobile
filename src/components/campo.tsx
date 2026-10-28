@@ -1,5 +1,5 @@
 import { useState, type Ref } from 'react';
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { StyleSheet, Text, TextInput, View, type TextInputInstance, type TextInputProps } from 'react-native';
 
 import { AlturaControle, Cores, Espaco, Fontes, Raio } from '@/constants/theme';
 
@@ -7,7 +7,7 @@ export interface CampoProps extends TextInputProps {
   rotulo: string;
   dica?: string;
   erro?: string;
-  ref?: Ref<TextInput>;
+  ref?: Ref<TextInputInstance>;
 }
 
 export function Campo({ rotulo, dica, erro, ref, ...inputProps }: CampoProps) {
