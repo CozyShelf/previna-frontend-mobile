@@ -12,7 +12,7 @@ export default function InicioScreen() {
   return (
     <Tela
       titulo="Seu acesso está pronto"
-      descricao="Em breve você vai acompanhar por aqui suas consultas de pré-natal, seus pontos e os cupons disponíveis."
+      descricao="Acompanhe seus pontos na aba Pontos. Em breve você também vai ver por aqui suas consultas de pré-natal e os cupons disponíveis."
       edges={['top', 'left', 'right']}>
       {null}
     </Tela>

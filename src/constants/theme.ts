@@ -13,6 +13,7 @@ export const Cores = {
   erro: '#b91c1c',
   erroFundo: '#fef2f2',
   erroBorda: '#fecaca',
+  sucesso: '#047857',
 } as const;
 
 export const Fontes = {
