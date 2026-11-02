@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { CartaoAgendamento, type Agendamento } from '@/components/agendamento';
+import { SecaoAgendamentos, separarPorData, type Agendamento } from '@/components/agendamento';
 import { Alerta } from '@/components/alerta';
 import { Tela } from '@/components/tela';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
@@ -40,18 +40,28 @@ export default function InicioScreen() {
             consultas de pré-natal.
           </Text>
         ) : null}
-        {/* A ordem vem do backend: pendentes primeiro, depois pela data prevista */}
-        {agendamentos?.map((agendamento) => (
-          <CartaoAgendamento key={agendamento.id} agendamento={agendamento} />
-        ))}
+        {/* A ordem do backend é a do portal (pendentes primeiro); aqui a gestante quer saber o que
+            ainda vem, então a lista é separada e reordenada por data */}
+        {agendamentos ? <Agenda agendamentos={agendamentos} /> : null}
       </View>
     </Tela>
   );
 }
 
+function Agenda({ agendamentos }: { agendamentos: Agendamento[] }) {
+  const { proximos, passados } = separarPorData(agendamentos);
+
+  return (
+    <>
+      <SecaoAgendamentos titulo="Próximos" agendamentos={proximos} />
+      <SecaoAgendamentos titulo="Já passaram" agendamentos={passados} />
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   lista: {
-    gap: Espaco.tres,
+    gap: Espaco.seis,
   },
   aviso: {
     fontFamily: Fontes.regular,

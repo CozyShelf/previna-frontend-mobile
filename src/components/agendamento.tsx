@@ -25,6 +25,24 @@ export interface Agendamento {
 // aaaa-mm-dd -> dd/mm/aaaa
 const formatarData = (data: string) => data.split('-').reverse().join('/');
 
+// sv-SE formata a data local como aaaa-mm-dd, o mesmo formato em que a API devolve dataPrevista
+const hoje = () => new Date().toLocaleDateString('sv-SE');
+
+// O dia de hoje conta como próximo: ainda pode acontecer. As datas são aaaa-mm-dd, então a comparação
+// de texto já é cronológica. O id desempata para a ordem não mudar entre carregamentos.
+export function separarPorData(agendamentos: Agendamento[]) {
+  const limite = hoje();
+  return {
+    proximos: agendamentos
+      .filter((agendamento) => agendamento.dataPrevista >= limite)
+      .sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista) || a.id - b.id),
+    // Do mais recente para o mais antigo: o que acabou de passar interessa mais
+    passados: agendamentos
+      .filter((agendamento) => agendamento.dataPrevista < limite)
+      .sort((a, b) => b.dataPrevista.localeCompare(a.dataPrevista) || b.id - a.id),
+  };
+}
+
 export interface CartaoAgendamentoProps {
   agendamento: Agendamento;
 }
@@ -53,6 +71,29 @@ export function CartaoAgendamento({ agendamento }: CartaoAgendamentoProps) {
   );
 }
 
+export interface SecaoAgendamentosProps {
+  titulo: string;
+  agendamentos: Agendamento[];
+}
+
+// Seção vazia não aparece: a gestante só vê o que ela tem
+export function SecaoAgendamentos({ titulo, agendamentos }: SecaoAgendamentosProps) {
+  if (agendamentos.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.secao}>
+      <Text style={styles.secaoTitulo} accessibilityRole="header">
+        {titulo} ({agendamentos.length})
+      </Text>
+      {agendamentos.map((agendamento) => (
+        <CartaoAgendamento key={agendamento.id} agendamento={agendamento} />
+      ))}
+    </View>
+  );
+}
+
 // Mesmas cores das pílulas do portal: âmbar espera uma ação do médico, esmeralda concluiu, zinc é neutro
 const CORES_SELO: Record<StatusAgendamento, { fundo: string; texto: string }> = {
   AGENDADO: { fundo: '#fffbeb', texto: '#92400e' },
@@ -61,6 +102,14 @@ const CORES_SELO: Record<StatusAgendamento, { fundo: string; texto: string }> = 
 };
 
 const styles = StyleSheet.create({
+  secao: {
+    gap: Espaco.tres,
+  },
+  secaoTitulo: {
+    fontFamily: Fontes.seminegrito,
+    fontSize: 16,
+    color: Cores.texto,
+  },
   cartao: {
     borderWidth: 1,
     borderColor: Cores.borda,
