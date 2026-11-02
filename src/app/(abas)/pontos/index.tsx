@@ -44,6 +44,7 @@ export default function PontuacaoScreen() {
     <Tela
       titulo="Minha pontuação"
       descricao="Você ganha pontos a cada consulta e exame do pré-natal e pode trocá-los por cupons."
+      alinharTopo
       edges={['top', 'left', 'right']}>
       {erro && <Alerta mensagem={erro} />}
       {pontuacao && (

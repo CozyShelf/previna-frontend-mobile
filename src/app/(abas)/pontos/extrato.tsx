@@ -79,6 +79,7 @@ export default function ExtratoScreen() {
     <Tela
       titulo="Extrato de pontos"
       descricao="Os pontos que você ganhou nas consultas e exames e os que trocou por cupons."
+      alinharTopo
       edges={['top', 'left', 'right']}>
       <View style={styles.conteudo}>
         <Opcoes rotulo="Tipo" opcoes={TIPOS} selecionada={tipo} onChange={setTipo} />
