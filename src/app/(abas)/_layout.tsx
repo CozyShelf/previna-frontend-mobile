@@ -31,6 +31,19 @@ export default function AbasLayout() {
         }}
       />
       <Tabs.Screen
+        name="pontos"
+        options={{
+          title: 'Pontos',
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: 'star.fill', android: 'star', web: 'star' }}
+              tintColor={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="perfil"
         options={{
           title: 'Perfil',

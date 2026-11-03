@@ -172,6 +172,6 @@ const styles = StyleSheet.create({
   salvo: {
     fontFamily: Fontes.media,
     fontSize: 15,
-    color: '#047857',
+    color: Cores.sucesso,
   },
 });
