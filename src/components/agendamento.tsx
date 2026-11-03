@@ -65,8 +65,13 @@ export function CartaoAgendamento({ agendamento }: CartaoAgendamentoProps) {
       {agendamento.observacao ? (
         <Text style={styles.observacao}>{agendamento.observacao}</Text>
       ) : null}
+<<<<<<< HEAD
       {/* O valor creditado é pontosBase x fator de ponderação e aparece na aba Pontos: mostrar
           pontosBase aqui mentiria assim que o fator deixar de ser 1,00. */}
+=======
+      {/* O valor creditado é pontosBase x fator de ponderação, e a API não devolve esse número por
+          agendamento: mostrar pontosBase aqui mentiria assim que o fator deixar de ser 1,00. */}
+>>>>>>> origin/master
     </View>
   );
 }

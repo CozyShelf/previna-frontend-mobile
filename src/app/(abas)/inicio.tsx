@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+=======
+import { useEffect, useState } from 'react';
+>>>>>>> origin/master
 import { StyleSheet, Text, View } from 'react-native';
 
 import { SecaoAgendamentos, separarPorData, type Agendamento } from '@/components/agendamento';
@@ -18,6 +22,7 @@ export default function InicioScreen() {
     lembrarSessao();
   }, []);
 
+<<<<<<< HEAD
   // Recarrega ao voltar para a aba: o médico pode ter confirmado uma consulta nesse meio-tempo
   useFocusEffect(
     useCallback(() => {
@@ -31,6 +36,15 @@ export default function InicioScreen() {
         );
     }, []),
   );
+=======
+  useEffect(() => {
+    get<Agendamento[]>('/gestantes/agendamentos')
+      .then(setAgendamentos)
+      .catch(() =>
+        setErro('Não foi possível carregar seus exames e consultas. Verifique sua conexão.'),
+      );
+  }, []);
+>>>>>>> origin/master
 
   return (
     <Tela
