@@ -3,6 +3,15 @@ import { router } from 'expo-router';
 import { API_URL } from '@/constants/api';
 import { encerrarSessao, obterToken } from '@/lib/sessao';
 
+// Resposta das listagens paginadas (PaginaResponse no backend); pagina começa em 0
+export interface Pagina<T> {
+  itens: T[];
+  pagina: number;
+  tamanho: number;
+  total: number;
+  totalPaginas: number;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,

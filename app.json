@@ -45,7 +45,8 @@
           "cameraPermission": "O Previna usa a câmera para você tirar a foto do seu perfil.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

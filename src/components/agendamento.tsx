@@ -25,23 +25,8 @@ export interface Agendamento {
 // aaaa-mm-dd -> dd/mm/aaaa
 const formatarData = (data: string) => data.split('-').reverse().join('/');
 
-// sv-SE formata a data local como aaaa-mm-dd, o mesmo formato em que a API devolve dataPrevista
-const hoje = () => new Date().toLocaleDateString('sv-SE');
-
-// O dia de hoje conta como próximo: ainda pode acontecer. As datas são aaaa-mm-dd, então a comparação
-// de texto já é cronológica. O id desempata para a ordem não mudar entre carregamentos.
-export function separarPorData(agendamentos: Agendamento[]) {
-  const limite = hoje();
-  return {
-    proximos: agendamentos
-      .filter((agendamento) => agendamento.dataPrevista >= limite)
-      .sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista) || a.id - b.id),
-    // Do mais recente para o mais antigo: o que acabou de passar interessa mais
-    passados: agendamentos
-      .filter((agendamento) => agendamento.dataPrevista < limite)
-      .sort((a, b) => b.dataPrevista.localeCompare(a.dataPrevista) || b.id - a.id),
-  };
-}
+// A separação deixou de ser por data: pendente é o que o médico ainda não resolveu, mesmo com a data
+// já passada. O backend separa e ordena (/gestantes/agendamentos?pendentes=true|false).
 
 export interface CartaoAgendamentoProps {
   agendamento: Agendamento;
@@ -65,13 +50,8 @@ export function CartaoAgendamento({ agendamento }: CartaoAgendamentoProps) {
       {agendamento.observacao ? (
         <Text style={styles.observacao}>{agendamento.observacao}</Text>
       ) : null}
-<<<<<<< HEAD
       {/* O valor creditado é pontosBase x fator de ponderação e aparece na aba Pontos: mostrar
           pontosBase aqui mentiria assim que o fator deixar de ser 1,00. */}
-=======
-      {/* O valor creditado é pontosBase x fator de ponderação, e a API não devolve esse número por
-          agendamento: mostrar pontosBase aqui mentiria assim que o fator deixar de ser 1,00. */}
->>>>>>> origin/master
     </View>
   );
 }
@@ -79,10 +59,12 @@ export function CartaoAgendamento({ agendamento }: CartaoAgendamentoProps) {
 export interface SecaoAgendamentosProps {
   titulo: string;
   agendamentos: Agendamento[];
+  // Quantos existem ao todo, quando a tela mostra só uma parte (a home mostra os primeiros pendentes)
+  total?: number;
 }
 
 // Seção vazia não aparece: a gestante só vê o que ela tem
-export function SecaoAgendamentos({ titulo, agendamentos }: SecaoAgendamentosProps) {
+export function SecaoAgendamentos({ titulo, agendamentos, total }: SecaoAgendamentosProps) {
   if (agendamentos.length === 0) {
     return null;
   }
@@ -90,7 +72,7 @@ export function SecaoAgendamentos({ titulo, agendamentos }: SecaoAgendamentosPro
   return (
     <View style={styles.secao}>
       <Text style={styles.secaoTitulo} accessibilityRole="header">
-        {titulo} ({agendamentos.length})
+        {titulo} ({total ?? agendamentos.length})
       </Text>
       {agendamentos.map((agendamento) => (
         <CartaoAgendamento key={agendamento.id} agendamento={agendamento} />
