@@ -44,6 +44,19 @@ export default function AbasLayout() {
         }}
       />
       <Tabs.Screen
+        name="cupons"
+        options={{
+          title: 'Cupons',
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: 'ticket.fill', android: 'confirmation_number', web: 'confirmation_number' }}
+              tintColor={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="perfil"
         options={{
           title: 'Perfil',
