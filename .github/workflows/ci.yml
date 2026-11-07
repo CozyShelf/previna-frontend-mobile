@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Um push novo no mesmo PR cancela a execução anterior
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualidade:
+    name: Lint, tipos e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # React Native 0.88 exige Node >= 22.13; mesma linha do container de desenvolvimento
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npx expo lint
+
+      - name: Tipos
+        run: npx tsc --noEmit
+
+      # Falha se a cobertura ficar abaixo dos pisos de jest.coverageThreshold (package.json)
+      - name: Testes
+        run: npm run test:coverage
+
+      - name: Relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-mobile
+          path: coverage/
+          if-no-files-found: ignore

@@ -1,6 +1,8 @@
+/// <reference types="jest" />
+
 import { fireEvent, render } from '@testing-library/react-native';
 
-import { CartaoConteudo, dominioDe, ehVideoDireto, fonteDaMidia, type Conteudo } from './conteudo';
+import { CartaoConteudo, dominioDe, ehVideoDireto, fonteDaMidia, type Conteudo } from '@/components/conteudo';
 
 jest.mock('@/lib/sessao', () => ({
   obterToken: () => 'token-de-teste',
