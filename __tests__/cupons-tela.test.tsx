@@ -1,190 +1,293 @@
 /// <reference types="jest" />
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, userEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import CuponsScreen from '@/app/(abas)/cupons';
-import type { CupomDisponivel } from '@/components/cupom';
-import { ApiError, get, post } from '@/lib/api';
+import { get } from '@/lib/api';
+import type { OfertaEmpresa, ProdutoOfertaResumo } from '@/lib/ofertas';
 
 jest.mock('@/lib/api', () => {
   class ApiError extends Error {
     status: number;
-    mensagem?: string;
-    constructor(codigo: number, texto?: string) {
+    constructor(codigo: number) {
       super(`Erro ${codigo}`);
       this.status = codigo;
-      this.mensagem = texto;
     }
   }
+  return { ApiError, get: jest.fn(), imagemDaApi: (caminho: string) => ({ uri: caminho }) };
+});
+
+// Fora de um navegador, a aba "ganha foco" ao montar (e de novo se o efeito mudar)
+jest.mock('expo-router', () => {
+  const { useEffect } = jest.requireActual('react');
   return {
-    ApiError,
-    get: jest.fn(),
-    post: jest.fn(),
-    imagemDaApi: (caminho: string) => ({ uri: caminho }),
+    router: { push: jest.fn() },
+    useFocusEffect: (efeito: () => void) => useEffect(() => efeito(), [efeito]),
   };
 });
 
-// Fora de um navegador, a aba "ganha foco" uma vez ao montar
-jest.mock('expo-router', () => {
-  const { useEffect } = jest.requireActual('react');
-  return { useFocusEffect: (efeito: () => void) => useEffect(() => efeito(), [efeito]) };
-});
-
 const mockGet = get as jest.Mock;
-const mockPost = post as jest.Mock;
+const mockPush = router.push as jest.Mock;
 
-const vida = { id: 1, nome: 'Farmácia Vida' };
-const fralda: CupomDisponivel = {
-  id: 5,
-  descricao: '10% de desconto em Fralda RN',
-  produto: 'Fralda RN',
-  categoria: 'FRALDAS',
-  desconto: 10,
-  dataValidade: '2026-12-31',
-  pontosNecessarios: 100,
-  empresa: vida,
-};
-const resgatado = {
-  id: 1,
-  codigo: 'ABCD2345',
-  descricao: '10% de desconto em Fralda RN',
-  empresa: 'Farmácia Vida',
-  dataValidade: '2026-12-31',
-  pontosGastos: 100,
-  saldo: 50,
-};
-
-// Responde a lista de cupons e o saldo, como a API
-function comApi(cupons: CupomDisponivel[], saldo: number) {
-  mockGet.mockImplementation((caminho: string) =>
-    Promise.resolve(caminho === '/cupons/disponiveis' ? cupons : { saldo, atividades: [] }),
-  );
+function produto(id: number): ProdutoOfertaResumo {
+  return {
+    id,
+    nome: `Produto ${id}`,
+    categoria: 'FRALDAS',
+    imagem: null,
+    menorPontos: 100,
+    maiorDescontoCupom: 10,
+    descontoPromocao: null,
+  };
 }
 
-async function abrirConfirmacao() {
-  await render(<CuponsScreen />);
-  await fireEvent.press(await screen.findByRole('button', { name: 'Resgatar' }));
-  return screen.getByRole('button', { name: 'Confirmar resgate' });
+function empresa(id: number, totalProdutos = 1): OfertaEmpresa {
+  return { id, nome: `Empresa ${id}`, segmento: null, logo: null, totalProdutos, produtos: [produto(id * 100)] };
 }
+
+function pagina(itens: OfertaEmpresa[], total = itens.length) {
+  return { itens, pagina: 0, tamanho: 10, total, totalPaginas: Math.ceil(total / 10) };
+}
+
+const empresas = (inicio: number, quantidade: number) =>
+  Array.from({ length: quantidade }, (_, i) => empresa(inicio + i));
+
+// Responde o saldo e, para as ofertas, o que "ofertas" devolver para o caminho pedido
+function comApi(ofertas: (caminho: string) => unknown, saldo: number | Error = 150) {
+  mockGet.mockImplementation((caminho: string) => {
+    if (caminho === '/gestantes/pontuacao') {
+      return saldo instanceof Error ? Promise.reject(saldo) : Promise.resolve({ saldo, atividades: [] });
+    }
+    const resposta = ofertas(caminho);
+    return resposta instanceof Error ? Promise.reject(resposta) : Promise.resolve(resposta);
+  });
+}
+
+const chamadasOfertas = () =>
+  mockGet.mock.calls.map(([caminho]) => caminho as string).filter((caminho) => caminho.startsWith('/ofertas'));
+
+// O ScrollView por baixo da FlatList: é nele que a rolagem e o puxar para recarregar acontecem
+const lista = () => screen.getByTestId('lista');
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
-describe('lista', () => {
-  it('mostra o saldo e os cupons agrupados pela loja', async () => {
-    comApi([fralda], 150);
+describe('carregamento', () => {
+  it('mostra o saldo e as empresas com os produtos', async () => {
+    comApi(() => pagina([empresa(1), empresa(2)]));
     await render(<CuponsScreen />);
 
-    expect(await screen.findByText('150 pontos')).toBeTruthy();
-    expect(screen.getByText('Farmácia Vida')).toBeTruthy();
-    expect(screen.getByText('Fralda RN')).toBeTruthy();
-    expect(mockGet).toHaveBeenCalledWith('/cupons/disponiveis');
+    expect(await screen.findByText('Empresa 1')).toBeTruthy();
+    expect(screen.getByText('Empresa 2')).toBeTruthy();
+    expect(screen.getByText('Produto 100')).toBeTruthy();
+    expect(screen.getByLabelText('Seu saldo: 150 pontos')).toBeTruthy();
+    expect(chamadasOfertas()).toEqual(['/ofertas?pagina=0&tamanho=10']);
   });
 
-  it('sem cupons mostra a mensagem de lista vazia', async () => {
-    comApi([], 0);
+  it('enquanto carrega mostra o aviso', async () => {
+    mockGet.mockReturnValue(new Promise(() => {}));
     await render(<CuponsScreen />);
 
-    expect(await screen.findByText(/Nenhum cupom disponível/)).toBeTruthy();
+    expect(screen.getByText('Carregando…')).toBeTruthy();
+    expect(screen.queryByText(/Nenhuma oferta/)).toBeNull();
   });
 
-  it('erro ao carregar mostra o alerta e não mostra lista', async () => {
-    mockGet.mockRejectedValue(new Error('sem rede'));
+  it('sem ofertas mostra a mensagem de lista vazia, sem "Limpar filtros"', async () => {
+    comApi(() => pagina([]));
     await render(<CuponsScreen />);
 
-    expect(await screen.findByText(/Não foi possível carregar os cupons/)).toBeTruthy();
+    expect(await screen.findByText(/Nenhuma oferta disponível no momento/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Limpar filtros' })).toBeNull();
+  });
+
+  it('erro ao carregar mostra o alerta e tentar de novo busca outra vez', async () => {
+    let falhar = true;
+    comApi(() => (falhar ? new Error('sem rede') : pagina([empresa(1)])));
+    await render(<CuponsScreen />);
+
+    expect(await screen.findByText(/Não foi possível carregar as ofertas/)).toBeTruthy();
+    expect(screen.queryByText('Carregando…')).toBeNull();
+
+    falhar = false;
+    await fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('Empresa 1')).toBeTruthy();
+    expect(screen.queryByText(/Não foi possível carregar as ofertas/)).toBeNull();
+  });
+
+  it('sem o saldo a lista aparece mesmo assim', async () => {
+    comApi(() => pagina([empresa(1)]), new Error('sem rede'));
+    await render(<CuponsScreen />);
+
+    expect(await screen.findByText('Empresa 1')).toBeTruthy();
     expect(screen.queryByText('Seu saldo')).toBeNull();
   });
 });
 
-describe('resgate', () => {
-  it('confirmação mostra o saldo antes e depois e cancelar não resgata', async () => {
-    comApi([fralda], 150);
-    await abrirConfirmacao();
+describe('rolagem infinita', () => {
+  it('no fim da lista busca a próxima página, uma vez só, com o indicador no rodapé', async () => {
+    let responderSegunda: (valor: unknown) => void = () => {};
+    mockGet.mockImplementation((caminho: string) => {
+      if (caminho === '/gestantes/pontuacao') {
+        return Promise.resolve({ saldo: 0 });
+      }
+      if (caminho.includes('pagina=1')) {
+        return new Promise((resolve) => (responderSegunda = resolve));
+      }
+      return Promise.resolve(pagina(empresas(1, 10), 12));
+    });
+    await render(<CuponsScreen />);
+    await screen.findByText('Empresa 1');
 
-    expect(screen.getByText('Resgatar cupom?')).toBeTruthy();
-    expect(screen.getByText('−100 pontos')).toBeTruthy();
-    expect(screen.getByText('50 pontos')).toBeTruthy();
+    await fireEvent(lista(), 'endReached');
+    await fireEvent(lista(), 'endReached');
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }));
-    expect(screen.queryByText('Resgatar cupom?')).toBeNull();
-    expect(mockPost).not.toHaveBeenCalled();
+    expect(chamadasOfertas()).toEqual(['/ofertas?pagina=0&tamanho=10', '/ofertas?pagina=1&tamanho=10']);
+    expect(screen.getByLabelText('Carregando mais')).toBeTruthy();
+
+    await act(async () => responderSegunda(pagina(empresas(11, 2), 12)));
+    expect(screen.queryByLabelText('Carregando mais')).toBeNull();
+
+    // Tudo carregado: o fim da lista não busca mais nada
+    await fireEvent(lista(), 'endReached');
+    expect(chamadasOfertas()).toHaveLength(2);
   });
 
-  it('resgate válido mostra o código e atualiza o saldo da tela', async () => {
-    comApi([fralda], 150);
-    mockPost.mockResolvedValue(resgatado);
-    await fireEvent.press(await abrirConfirmacao());
+  it('erro na próxima página aparece no rodapé, com a lista mantida, e dá para tentar de novo', async () => {
+    let falhar = true;
+    comApi((caminho) => {
+      if (caminho.includes('pagina=1')) {
+        return falhar ? new Error('sem rede') : pagina(empresas(11, 1), 11);
+      }
+      return pagina(empresas(1, 10), 11);
+    });
+    await render(<CuponsScreen />);
+    await screen.findByText('Empresa 1');
 
-    expect(await screen.findByText('ABCD2345')).toBeTruthy();
-    expect(mockPost).toHaveBeenCalledWith('/cupons/5/resgatar', {});
-    expect(screen.getAllByText('50 pontos').length).toBeGreaterThan(0);
+    await fireEvent(lista(), 'endReached');
+    expect(await screen.findByText(/Não foi possível carregar as ofertas/)).toBeTruthy();
+    expect(screen.getByText('Empresa 1')).toBeTruthy();
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Concluir' }));
-    expect(screen.queryByText('ABCD2345')).toBeNull();
-    // Saldo novo (50) não paga mais o cupom de 100
-    expect(screen.queryByRole('button', { name: 'Resgatar' })).toBeNull();
-    expect(screen.getByText('Faltam 50 pontos')).toBeTruthy();
+    falhar = false;
+    await fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(chamadasOfertas()).toEqual([
+      '/ofertas?pagina=0&tamanho=10',
+      '/ofertas?pagina=1&tamanho=10',
+      '/ofertas?pagina=1&tamanho=10',
+    ]);
+    expect(screen.queryByText(/Não foi possível carregar as ofertas/)).toBeNull();
   });
 
-  it('dois toques rápidos em confirmar mandam um resgate só', async () => {
-    comApi([fralda], 1000);
-    let responder: (valor: unknown) => void = () => {};
-    mockPost.mockReturnValue(new Promise((resolve) => (responder = resolve)));
-    const confirmar = await abrirConfirmacao();
+  it('puxar para recarregar volta para a primeira página e atualiza o saldo', async () => {
+    let saldo = 150;
+    mockGet.mockImplementation((caminho: string) =>
+      Promise.resolve(caminho === '/gestantes/pontuacao' ? { saldo } : pagina([empresa(1)])),
+    );
+    await render(<CuponsScreen />);
+    await screen.findByText('Empresa 1');
 
-    // Segundo toque no mesmo botão, com o primeiro resgate ainda em andamento
-    await fireEvent.press(confirmar);
-    await fireEvent.press(confirmar);
-    expect(mockPost).toHaveBeenCalledTimes(1);
+    saldo = 40;
+    await userEvent.setup().pullToRefresh(lista());
 
-    await act(async () => responder(resgatado));
-    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+    expect(await screen.findByLabelText('Seu saldo: 40 pontos')).toBeTruthy();
+    expect(chamadasOfertas()).toEqual(['/ofertas?pagina=0&tamanho=10', '/ofertas?pagina=0&tamanho=10']);
+  });
+});
+
+describe('filtros', () => {
+  it('categoria, tipo e "Cabe no meu saldo" vão como parâmetros para a API', async () => {
+    comApi(() => pagina([empresa(1)]));
+    await render(<CuponsScreen />);
+    await screen.findByText('Empresa 1');
+
+    await fireEvent.press(screen.getByRole('radio', { name: 'Roupas' }));
+    expect(chamadasOfertas().at(-1)).toBe('/ofertas?categoria=ROUPAS&pagina=0&tamanho=10');
+
+    await fireEvent.press(screen.getByRole('radio', { name: 'Promoção' }));
+    expect(chamadasOfertas().at(-1)).toBe('/ofertas?categoria=ROUPAS&tipo=PROMOCAO&pagina=0&tamanho=10');
+
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Cabe no meu saldo' }));
+    expect(screen.getByRole('checkbox', { name: 'Cabe no meu saldo' })).toBeChecked();
+    expect(chamadasOfertas().at(-1)).toBe(
+      '/ofertas?categoria=ROUPAS&tipo=PROMOCAO&ateMeusPontos=true&pagina=0&tamanho=10',
+    );
+
+    // Tocar de novo desmarca
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Cabe no meu saldo' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Roupas' }));
+    expect(chamadasOfertas().at(-1)).toBe('/ofertas?tipo=PROMOCAO&pagina=0&tamanho=10');
   });
 
-  it('durante o envio o botão fica desabilitado e não dá para cancelar', async () => {
-    comApi([fralda], 150);
-    mockPost.mockReturnValue(new Promise(() => {}));
-    await fireEvent.press(await abrirConfirmacao());
+  describe('busca', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
 
-    expect(await screen.findByRole('button', { name: 'Resgatando…' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('espera parar de digitar para buscar, uma vez só', async () => {
+      comApi(() => pagina([empresa(1)]));
+      await render(<CuponsScreen />);
+      await act(async () => {});
+      const campo = screen.getByLabelText('Buscar');
+
+      await fireEvent.changeText(campo, 'fr');
+      await act(async () => jest.advanceTimersByTime(200));
+      await fireEvent.changeText(campo, 'fralda ');
+      await act(async () => jest.advanceTimersByTime(399));
+      expect(chamadasOfertas()).toHaveLength(1);
+
+      await act(async () => jest.advanceTimersByTime(1));
+      expect(chamadasOfertas()).toEqual([
+        '/ofertas?pagina=0&tamanho=10',
+        '/ofertas?busca=fralda&pagina=0&tamanho=10',
+      ]);
+    });
+
+    it('sem resultado com filtros oferece limpar, e limpar volta para a lista completa', async () => {
+      comApi((caminho) => (caminho.includes('busca=') ? pagina([]) : pagina([empresa(1)])));
+      await render(<CuponsScreen />);
+      await act(async () => {});
+
+      await fireEvent.changeText(screen.getByLabelText('Buscar'), 'xyz');
+      await act(async () => jest.advanceTimersByTime(400));
+
+      expect(screen.getByText('Nenhuma oferta encontrada com esses filtros.')).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Limpar filtros' }));
+      await act(async () => jest.advanceTimersByTime(400));
+
+      expect(screen.getByLabelText('Buscar')).toHaveDisplayValue('');
+      expect(screen.getByText('Empresa 1')).toBeTruthy();
+      expect(chamadasOfertas().at(-1)).toBe('/ofertas?pagina=0&tamanho=10');
+    });
+  });
+});
+
+describe('navegação', () => {
+  it('tocar num produto abre o detalhe dele', async () => {
+    comApi(() => pagina([empresa(1)]));
+    await render(<CuponsScreen />);
+
+    await fireEvent.press(await screen.findByText('Produto 100'));
+
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/cupons/produto/[id]', params: { id: '100' } });
   });
 
-  it.each([
-    [409, 'Pontos insuficientes'],
-    [409, 'Cupom indisponível'],
-    [404, 'Cupom não encontrado'],
-  ])('erro %p "%s" mostra a mensagem da API, recarrega a lista e não oferece tentar de novo', async (status, mensagem) => {
-    comApi([fralda], 150);
-    mockPost.mockRejectedValue(new ApiError(status, mensagem));
-    await fireEvent.press(await abrirConfirmacao());
+  it('"Ver todos" abre a empresa levando o nome e os filtros ativos', async () => {
+    comApi(() => pagina([empresa(1, 14)]));
+    await render(<CuponsScreen />);
+    await screen.findByText('Empresa 1');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Fraldas' }));
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Cabe no meu saldo' }));
 
-    expect(await screen.findByText(`${mensagem}. A lista de cupons foi atualizada.`)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Confirmar resgate' })).toBeNull();
-    // Carga inicial (2 chamadas) + recarga depois do erro (2 chamadas)
-    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(4));
+    await fireEvent.press(await screen.findByRole('button', { name: /^Ver todos/ }));
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Fechar' }));
-    expect(screen.queryByText(mensagem, { exact: false })).toBeNull();
-  });
-
-  it('falha de rede mostra mensagem genérica e não recarrega', async () => {
-    comApi([fralda], 150);
-    mockPost.mockRejectedValue(new TypeError('Network request failed'));
-    await fireEvent.press(await abrirConfirmacao());
-
-    expect(await screen.findByText(/Verifique sua conexão e tente de novo/)).toBeTruthy();
-    expect(mockGet).toHaveBeenCalledTimes(2);
-  });
-
-  it('erro 500 não é tratado como cupom indisponível', async () => {
-    comApi([fralda], 150);
-    mockPost.mockRejectedValue(new ApiError(500));
-    await fireEvent.press(await abrirConfirmacao());
-
-    expect(await screen.findByText(/Não foi possível resgatar o cupom/)).toBeTruthy();
-    expect(screen.queryByText(/foi atualizada/)).toBeNull();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/cupons/empresa/[id]',
+      params: { id: '1', nome: 'Empresa 1', categoria: 'FRALDAS', ateMeusPontos: 'true' },
+    });
   });
 });

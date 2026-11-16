@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 import AbasLayout from '@/app/(abas)/_layout';
 import RootLayout from '@/app/_layout';
+import CuponsLayout from '@/app/(abas)/cupons/_layout';
 import InicioLayout from '@/app/(abas)/inicio/_layout';
 import PontosLayout from '@/app/(abas)/pontos/_layout';
 import { obterToken, restaurarSessao } from '@/lib/sessao';
@@ -135,6 +136,12 @@ it('layout de pontos é uma pilha', async () => {
 
 it('layout do início é uma pilha', async () => {
   await render(<InicioLayout />);
+
+  expect(screen.getByText('Pilha de telas')).toBeTruthy();
+});
+
+it('layout de cupons é uma pilha', async () => {
+  await render(<CuponsLayout />);
 
   expect(screen.getByText('Pilha de telas')).toBeTruthy();
 });
