@@ -16,6 +16,7 @@ import { DialogoResgate, type CupomParaResgate, type CupomResgatado } from '@/co
 import { Tela } from '@/components/tela';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
 import { ApiError, get, post } from '@/lib/api';
+import { gerarChaveIdempotencia } from '@/lib/idempotencia';
 import { buscarSaldo, ROTULO_CATEGORIA, type CupomOferta, type ProdutoOfertaDetalhe } from '@/lib/ofertas';
 
 // Inexistente, sem oferta ou id inválido têm a mesma resposta: a gestante não precisa saber qual é
@@ -33,10 +34,15 @@ export default function ProdutoScreen() {
   const [selecionado, setSelecionado] = useState<CupomParaResgate>();
   const [resgatado, setResgatado] = useState<CupomResgatado>();
   const [erroResgate, setErroResgate] = useState<string>();
+  // Falha sem resposta conclusiva (rede, 5xx): o resgate pode ter sido feito ou não, então dá para tentar de novo
+  const [podeTentarDeNovo, setPodeTentarDeNovo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   // O estado só desabilita o botão no próximo render: dois toques rápidos mandariam dois resgates e gastariam
   // os pontos em dobro. A ref barra o segundo toque na hora.
   const emEnvio = useRef(false);
+  // Idempotency-Key deste resgate: a mesma em todas as tentativas, para o servidor não debitar duas vezes se a
+  // primeira chegou e só a resposta se perdeu. Uma nova a cada cupom escolhido e depois de um resultado definitivo.
+  const chaveResgate = useRef<string>(undefined);
 
   const carregar = useCallback(() => {
     if (!idValido) {
@@ -64,6 +70,7 @@ export default function ProdutoScreen() {
 
   function escolher(cupom: CupomOferta) {
     if (produto) {
+      chaveResgate.current = gerarChaveIdempotencia();
       setSelecionado({ ...cupom, produto: produto.nome, empresa: produto.empresa.nome });
     }
   }
@@ -75,18 +82,27 @@ export default function ProdutoScreen() {
     emEnvio.current = true;
     setEnviando(true);
     setErroResgate(undefined);
+    setPodeTentarDeNovo(false);
+    chaveResgate.current ??= gerarChaveIdempotencia();
     try {
-      const resposta = await post<CupomResgatado>(`/cupons/${selecionado.id}/resgatar`, {});
+      // 201 no primeiro resgate e 200 quando o servidor reconhece a chave e devolve o já feito: os dois são sucesso
+      const resposta = await post<CupomResgatado>(`/cupons/${selecionado.id}/resgatar`, {}, {
+        'Idempotency-Key': chaveResgate.current,
+      });
+      chaveResgate.current = undefined;
       setResgatado(resposta);
       setSaldo(resposta.saldo);
     } catch (e) {
       // 404 "Cupom não encontrado", 409 "Cupom indisponível" ou "Pontos insuficientes", com a mensagem da API:
       // as ofertas ou o saldo na tela estavam desatualizados, então recarrega
       if (e instanceof ApiError && (e.status === 404 || e.status === 409)) {
+        chaveResgate.current = undefined;
         setErroResgate(`${e.mensagem ?? 'Cupom indisponível'}. As ofertas deste produto foram atualizadas.`);
         carregar();
       } else {
+        // Mantém a chave: se o primeiro envio chegou ao servidor, a nova tentativa recebe o mesmo resgate
         setErroResgate('Não foi possível resgatar o cupom. Verifique sua conexão e tente de novo.');
+        setPodeTentarDeNovo(true);
       }
     } finally {
       emEnvio.current = false;
@@ -95,6 +111,8 @@ export default function ProdutoScreen() {
   }
 
   function fechar() {
+    chaveResgate.current = undefined;
+    setPodeTentarDeNovo(false);
     setSelecionado(undefined);
     setResgatado(undefined);
     setErroResgate(undefined);
@@ -156,6 +174,7 @@ export default function ProdutoScreen() {
         saldo={saldo}
         resgatado={resgatado}
         erro={erroResgate}
+        podeTentarDeNovo={podeTentarDeNovo}
         enviando={enviando}
         onConfirmar={() => void resgatar()}
         onFechar={fechar}

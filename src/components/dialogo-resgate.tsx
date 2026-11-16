@@ -29,13 +29,24 @@ export interface DialogoResgateProps {
   saldo: number;
   resgatado?: CupomResgatado;
   erro?: string;
+  // Com erro, mostra "Tentar de novo" em vez de só fechar (falha de rede, em que o resgate pode ser repetido)
+  podeTentarDeNovo?: boolean;
   enviando: boolean;
   onConfirmar: () => void;
   onFechar: () => void;
 }
 
 // Pede a confirmação antes de gastar os pontos e, depois, mostra o código que a gestante apresenta na loja
-export function DialogoResgate({ cupom, saldo, resgatado, erro, enviando, onConfirmar, onFechar }: DialogoResgateProps) {
+export function DialogoResgate({
+  cupom,
+  saldo,
+  resgatado,
+  erro,
+  podeTentarDeNovo,
+  enviando,
+  onConfirmar,
+  onFechar,
+}: DialogoResgateProps) {
   return (
     <Modal visible={!!cupom} transparent animationType="fade" onRequestClose={enviando ? undefined : onFechar}>
       <View style={styles.fundo}>
@@ -50,6 +61,7 @@ export function DialogoResgate({ cupom, saldo, resgatado, erro, enviando, onConf
                 cupom={cupom}
                 saldo={saldo}
                 erro={erro}
+                podeTentarDeNovo={podeTentarDeNovo}
                 enviando={enviando}
                 onConfirmar={onConfirmar}
                 onFechar={onFechar}
@@ -66,12 +78,13 @@ interface ConfirmacaoProps {
   cupom: CupomParaResgate;
   saldo: number;
   erro?: string;
+  podeTentarDeNovo?: boolean;
   enviando: boolean;
   onConfirmar: () => void;
   onFechar: () => void;
 }
 
-function Confirmacao({ cupom, saldo, erro, enviando, onConfirmar, onFechar }: ConfirmacaoProps) {
+function Confirmacao({ cupom, saldo, erro, podeTentarDeNovo, enviando, onConfirmar, onFechar }: ConfirmacaoProps) {
   return (
     <>
       <Text style={styles.titulo} accessibilityRole="header">
@@ -92,10 +105,11 @@ function Confirmacao({ cupom, saldo, erro, enviando, onConfirmar, onFechar }: Co
       {erro && <Alerta mensagem={erro} />}
 
       <View style={styles.botoes}>
-        {/* Depois de um erro (cupom saiu do ar, saldo mudou) não adianta tentar de novo: só fechar */}
-        {!erro && (
+        {/* Depois de um erro (cupom saiu do ar, saldo mudou) não adianta tentar de novo: só fechar. Na falha de
+            rede, sim: a nova tentativa vai com a mesma chave e não debita duas vezes */}
+        {(!erro || podeTentarDeNovo) && (
           <Botao
-            rotulo={enviando ? 'Resgatando…' : 'Confirmar resgate'}
+            rotulo={enviando ? 'Resgatando…' : erro ? 'Tentar de novo' : 'Confirmar resgate'}
             estilo="primario"
             desabilitado={enviando}
             onPress={onConfirmar}
