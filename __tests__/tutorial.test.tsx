@@ -96,6 +96,16 @@ async function abrir() {
   );
 }
 
+// Dois toques no mesmo instante, sem render entre eles: o botão ainda está habilitado no segundo. O onClick do
+// Pressable (o clique de acessibilidade) chama o onPress direto, então os dois cabem num act só.
+async function tocarDuasVezes(botao: { props: Record<string, unknown> }) {
+  const clicar = botao.props.onClick as (evento: object) => void;
+  await act(async () => {
+    clicar({});
+    clicar({});
+  });
+}
+
 async function proximo() {
   await fireEvent.press(screen.getByRole('button', { name: 'Próximo' }));
 }
@@ -169,6 +179,20 @@ it('falha ao concluir mostra o erro e deixa tentar de novo', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Começar' }));
   expect(screen.queryByText(/Não foi possível concluir/)).toBeNull();
   expect(router.replace).toHaveBeenCalledWith('/inicio');
+});
+
+it('dois toques rápidos em começar mandam uma requisição só', async () => {
+  let responder: () => void = () => {};
+  mockPut.mockReturnValue(new Promise<void>((resolve) => (responder = resolve)));
+  await abrir();
+  await proximo();
+  await proximo();
+
+  await tocarDuasVezes(screen.getByRole('button', { name: 'Começar' }));
+  expect(mockPut).toHaveBeenCalledTimes(1);
+
+  await act(async () => responder());
+  expect(router.replace).toHaveBeenCalledTimes(1);
 });
 
 it('durante o envio o botão fica desabilitado', async () => {

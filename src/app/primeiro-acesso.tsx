@@ -116,6 +116,8 @@ export default function PrimeiroAcessoScreen() {
   const [foto, setFoto] = useState<string | null>();
   const [erro, setErro] = useState<string>();
   const [enviando, setEnviando] = useState(false);
+  // O estado só desabilita o botão no próximo render: a ref barra na hora um segundo toque rápido
+  const emEnvio = useRef(false);
   const [visiveis, setVisiveis] = useState<CampoValidado[]>([]);
   const refLogin = useRef<TextInputInstance>(null);
   const refSenha = useRef<TextInputInstance>(null);
@@ -133,6 +135,9 @@ export default function PrimeiroAcessoScreen() {
     setVisiveis((atuais) => (atuais.includes(campo) ? atuais : [...atuais, campo]));
 
   async function salvar() {
+    if (emEnvio.current) {
+      return;
+    }
     setVisiveis(CAMPOS);
     const invalido = CAMPOS.find((campo) => erros[campo]);
     if (invalido) {
@@ -145,6 +150,7 @@ export default function PrimeiroAcessoScreen() {
       setErro('Para continuar, autorize o uso dos seus dados.');
       return;
     }
+    emEnvio.current = true;
     setErro(undefined);
     setEnviando(true);
     try {
@@ -179,6 +185,7 @@ export default function PrimeiroAcessoScreen() {
           : 'Não foi possível salvar. Verifique sua conexão e tente novamente.',
       );
     } finally {
+      emEnvio.current = false;
       setEnviando(false);
     }
   }

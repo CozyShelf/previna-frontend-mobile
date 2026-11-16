@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Alerta } from '@/components/alerta';
@@ -44,6 +44,8 @@ export default function PerfilScreen() {
   const [erro, setErro] = useState<string>();
   const [salvo, setSalvo] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  // O estado só desabilita o botão no próximo render: a ref barra na hora um segundo toque rápido
+  const emEnvio = useRef(false);
 
   useEffect(() => {
     get<PerfilGestante>('/gestantes/perfil')
@@ -58,11 +60,15 @@ export default function PerfilScreen() {
   const erros = validar(telefone, email.trim());
 
   async function salvar() {
+    if (emEnvio.current) {
+      return;
+    }
     setSalvo(false);
     setMostrarErros(true);
     if (erros.telefone || erros.email) {
       return;
     }
+    emEnvio.current = true;
     setErro(undefined);
     setEnviando(true);
     try {
@@ -87,6 +93,7 @@ export default function PerfilScreen() {
             : 'Não foi possível salvar. Verifique sua conexão e tente novamente.',
       );
     } finally {
+      emEnvio.current = false;
       setEnviando(false);
     }
   }
