@@ -2,8 +2,9 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Alerta } from '@/components/alerta';
 import { Botao } from '@/components/botao';
-import { formatarData, formatarDesconto, formatarPontos, type CupomDisponivel } from '@/components/cupom';
+import { formatarData, formatarDesconto, formatarPontos } from '@/components/cupom';
 import { Cores, Espaco, Fontes, Raio } from '@/constants/theme';
+import type { CupomOferta } from '@/lib/ofertas';
 
 // Mesmo formato do CupomResgatadoResponse no backend
 export interface CupomResgatado {
@@ -16,9 +17,15 @@ export interface CupomResgatado {
   saldo: number;
 }
 
+// O cupom escolhido no detalhe do produto, com os nomes que a confirmação mostra
+export interface CupomParaResgate extends CupomOferta {
+  produto: string;
+  empresa: string;
+}
+
 export interface DialogoResgateProps {
   // Sem cupom, o diálogo fica fechado
-  cupom?: CupomDisponivel;
+  cupom?: CupomParaResgate;
   saldo: number;
   resgatado?: CupomResgatado;
   erro?: string;
@@ -56,7 +63,7 @@ export function DialogoResgate({ cupom, saldo, resgatado, erro, enviando, onConf
 }
 
 interface ConfirmacaoProps {
-  cupom: CupomDisponivel;
+  cupom: CupomParaResgate;
   saldo: number;
   erro?: string;
   enviando: boolean;
@@ -71,7 +78,7 @@ function Confirmacao({ cupom, saldo, erro, enviando, onConfirmar, onFechar }: Co
         Resgatar cupom?
       </Text>
       <Text style={styles.texto}>
-        {formatarDesconto(cupom.desconto)} de desconto em {cupom.produto}, na {cupom.empresa.nome}. Válido até{' '}
+        {formatarDesconto(cupom.desconto)} de desconto em {cupom.produto}, na {cupom.empresa}. Válido até{' '}
         {formatarData(cupom.dataValidade)}.
       </Text>
 
