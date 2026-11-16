@@ -21,7 +21,7 @@ os pontos por cupons de desconto das empresas parceiras.
 | `/tutorial`            | Apresentação do app no primeiro uso                                    |
 | `/inicio`              | Próximos exames e consultas e os já realizados                         |
 | `/pontos`              | Saldo e atividades que geraram pontos; `/pontos/extrato` com filtros   |
-| `/cupons`              | Cupons ativos das empresas parceiras, agrupados por loja, e o resgate  |
+| `/cupons`              | Ofertas das empresas parceiras, com filtros; abre `empresa/[id]` ("Ver todos") e `produto/[id]` (cupons, promoção e resgate) |
 | `/perfil`              | Contato, foto e saída da conta                                         |
 
 As quatro últimas são as abas (`src/app/(abas)/`) e exigem sessão; sem token, o app volta para o login.
@@ -64,7 +64,7 @@ Instale dependências com `npx expo install <pacote>`, que escolhe a versão com
 src/
   app/          telas (Expo Router); (abas)/ são as abas da gestante logada
   components/   componentes de tela (cartões, formulários, diálogo de resgate)
-  lib/          cliente da API, sessão e máscaras
+  lib/          cliente da API, sessão, máscaras, catálogo de ofertas e paginação
   constants/    tema (cores, fontes, espaços) e URL da API
 __tests__/      testes (fora de src/app, senão o Expo Router os trataria como telas)
 ```
