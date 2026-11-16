@@ -59,6 +59,17 @@ describe('cabeçalhos', () => {
     expect(init.headers['Content-Type']).toBe('application/json');
   });
 
+  it('post leva os cabeçalhos extras, sem trocar o token', async () => {
+    mockObterToken.mockReturnValue('tok');
+    await post('/cupons/9/resgatar', {}, { 'Idempotency-Key': 'chave-1', Authorization: 'Bearer outro' });
+
+    expect(cabecalhosEnviados()).toEqual({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': 'chave-1',
+      Authorization: 'Bearer tok',
+    });
+  });
+
   it('put com objeto manda JSON', async () => {
     await put('/gestantes/tutorial-concluido', {});
 

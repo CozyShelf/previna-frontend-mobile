@@ -21,13 +21,16 @@ export class ApiError extends Error {
   }
 }
 
-async function requisicao<T>(caminho: string, init: RequestInit = {}): Promise<T> {
+type Cabecalhos = Record<string, string>;
+
+async function requisicao<T>(caminho: string, init: RequestInit = {}, cabecalhos: Cabecalhos = {}): Promise<T> {
   const token = obterToken();
   const resposta = await fetch(`${API_URL}${caminho}`, {
     ...init,
     headers: {
       // FormData (upload) leva o próprio Content-Type, com o separador do multipart
       ...(!(init.body instanceof FormData) && { 'Content-Type': 'application/json' }),
+      ...cabecalhos,
       ...(token && { Authorization: `Bearer ${token}` }),
     },
   });
@@ -48,8 +51,9 @@ export function get<T>(caminho: string) {
   return requisicao<T>(caminho);
 }
 
-export function post<T>(caminho: string, corpo: unknown) {
-  return requisicao<T>(caminho, { method: 'POST', body: JSON.stringify(corpo) });
+// cabecalhos: extras da chamada, como o Idempotency-Key do resgate
+export function post<T>(caminho: string, corpo: unknown, cabecalhos?: Cabecalhos) {
+  return requisicao<T>(caminho, { method: 'POST', body: JSON.stringify(corpo) }, cabecalhos);
 }
 
 export function put<T>(caminho: string, corpo: unknown) {
