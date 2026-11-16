@@ -1,5 +1,14 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { ReactElement, ReactNode } from 'react';
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { Logo } from '@/components/logo';
@@ -42,6 +51,82 @@ export function Tela({ titulo, descricao, children, edges, alinharTopo }: TelaPr
   );
 }
 
+export interface TelaListaProps<T> {
+  titulo: string;
+  descricao: string;
+  // Fica entre o título e os itens (saldo, filtros, avisos). É um elemento, não um componente, para o
+  // campo de busca não ser recriado (e perder o foco) a cada render
+  cabecalho?: ReactNode;
+  // Indefinido enquanto carrega: a lista fica vazia sem mostrar o "vazio"
+  itens?: readonly T[];
+  chave: (item: T) => string;
+  renderizar: (item: T) => ReactElement;
+  // Mostrado quando a lista chegou e não tem itens
+  vazio?: ReactNode;
+  rodape?: ReactNode;
+  espacoEntreItens?: number;
+  recarregando: boolean;
+  onRecarregar: () => void;
+  onFimDaLista: () => void;
+}
+
+// Variante da Tela para listas longas: a própria FlatList rola a tela inteira (dentro do ScrollView da
+// Tela ela perderia a virtualização e o onEndReached), com o mesmo cabeçalho e puxar para recarregar
+export function TelaLista<T>({
+  titulo,
+  descricao,
+  cabecalho,
+  itens,
+  chave,
+  renderizar,
+  vazio,
+  rodape,
+  espacoEntreItens = Espaco.oito,
+  recarregando,
+  onRecarregar,
+  onFimDaLista,
+}: TelaListaProps<T>) {
+  return (
+    <SafeAreaView style={styles.area} edges={['top', 'left', 'right']}>
+      <FlatList
+        testID="lista"
+        data={itens}
+        keyExtractor={chave}
+        renderItem={({ item }) => (
+          <View style={[styles.coluna, { marginBottom: espacoEntreItens }]}>{renderizar(item)}</View>
+        )}
+        onEndReached={onFimDaLista}
+        onEndReachedThreshold={0.5}
+        contentContainerStyle={[styles.conteudo, styles.noTopo]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl
+            refreshing={recarregando}
+            onRefresh={onRecarregar}
+            tintColor={Cores.previna600}
+            colors={[Cores.previna600]}
+          />
+        }
+        ListHeaderComponent={
+          <View style={[styles.coluna, styles.listaCabecalho]}>
+            <Logo />
+            <View style={styles.cabecalho}>
+              <Text style={styles.titulo} accessibilityRole="header">
+                {titulo}
+              </Text>
+              <Text style={styles.descricao}>{descricao}</Text>
+            </View>
+            {cabecalho}
+          </View>
+        }
+        ListEmptyComponent={itens && vazio ? <View style={styles.coluna}>{vazio}</View> : undefined}
+        ListFooterComponent={rodape ? <View style={styles.coluna}>{rodape}</View> : undefined}
+      />
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   area: {
     flex: 1,
@@ -63,6 +148,9 @@ const styles = StyleSheet.create({
   },
   cabecalho: {
     gap: Espaco.um,
+  },
+  listaCabecalho: {
+    marginBottom: Espaco.oito,
   },
   titulo: {
     fontFamily: Fontes.seminegrito,
