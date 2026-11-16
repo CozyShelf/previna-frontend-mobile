@@ -40,9 +40,11 @@ export default function ProdutoScreen() {
   // O estado só desabilita o botão no próximo render: dois toques rápidos mandariam dois resgates e gastariam
   // os pontos em dobro. A ref barra o segundo toque na hora.
   const emEnvio = useRef(false);
-  // Idempotency-Key deste resgate: a mesma em todas as tentativas, para o servidor não debitar duas vezes se a
-  // primeira chegou e só a resposta se perdeu. Uma nova a cada cupom escolhido e depois de um resultado definitivo.
-  const chaveResgate = useRef<string>(undefined);
+  // Idempotency-Key pendente de cada cupom (id → chave): todas as tentativas de um resgate vão com a mesma, para o
+  // servidor não debitar duas vezes se a primeira chegou e só a resposta se perdeu. Fechar o diálogo depois de uma
+  // falha de rede não descarta a chave: reabrir o mesmo cupom repete o mesmo resgate. Só a resposta definitiva do
+  // servidor (2xx ou 4xx) encerra o resgate; o próximo daquele cupom ganha chave nova.
+  const chavesPendentes = useRef(new Map<number, string>());
 
   const carregar = useCallback(() => {
     if (!idValido) {
@@ -70,7 +72,6 @@ export default function ProdutoScreen() {
 
   function escolher(cupom: CupomOferta) {
     if (produto) {
-      chaveResgate.current = gerarChaveIdempotencia();
       setSelecionado({ ...cupom, produto: produto.nome, empresa: produto.empresa.nome });
     }
   }
@@ -83,26 +84,29 @@ export default function ProdutoScreen() {
     setEnviando(true);
     setErroResgate(undefined);
     setPodeTentarDeNovo(false);
-    chaveResgate.current ??= gerarChaveIdempotencia();
+    const cupomId = selecionado.id;
+    const chave = chavesPendentes.current.get(cupomId) ?? gerarChaveIdempotencia();
+    chavesPendentes.current.set(cupomId, chave);
     try {
       // 201 no primeiro resgate e 200 quando o servidor reconhece a chave e devolve o já feito: os dois são sucesso
-      const resposta = await post<CupomResgatado>(`/cupons/${selecionado.id}/resgatar`, {}, {
-        'Idempotency-Key': chaveResgate.current,
-      });
-      chaveResgate.current = undefined;
+      const resposta = await post<CupomResgatado>(`/cupons/${cupomId}/resgatar`, {}, { 'Idempotency-Key': chave });
+      chavesPendentes.current.delete(cupomId);
       setResgatado(resposta);
       setSaldo(resposta.saldo);
     } catch (e) {
+      const definitiva = e instanceof ApiError && e.status >= 400 && e.status < 500;
+      if (definitiva) {
+        chavesPendentes.current.delete(cupomId);
+      }
       // 404 "Cupom não encontrado", 409 "Cupom indisponível" ou "Pontos insuficientes", com a mensagem da API:
       // as ofertas ou o saldo na tela estavam desatualizados, então recarrega
       if (e instanceof ApiError && (e.status === 404 || e.status === 409)) {
-        chaveResgate.current = undefined;
         setErroResgate(`${e.mensagem ?? 'Cupom indisponível'}. As ofertas deste produto foram atualizadas.`);
         carregar();
       } else {
-        // Mantém a chave: se o primeiro envio chegou ao servidor, a nova tentativa recebe o mesmo resgate
+        // Rede ou 5xx: a chave continua pendente e a nova tentativa, se o primeiro envio chegou, recebe o mesmo resgate
         setErroResgate('Não foi possível resgatar o cupom. Verifique sua conexão e tente de novo.');
-        setPodeTentarDeNovo(true);
+        setPodeTentarDeNovo(!definitiva);
       }
     } finally {
       emEnvio.current = false;
@@ -111,7 +115,6 @@ export default function ProdutoScreen() {
   }
 
   function fechar() {
-    chaveResgate.current = undefined;
     setPodeTentarDeNovo(false);
     setSelecionado(undefined);
     setResgatado(undefined);

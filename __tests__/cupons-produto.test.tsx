@@ -228,7 +228,7 @@ describe('resgate', () => {
     expect(await screen.findByText('ABCD2345')).toBeTruthy();
   });
 
-  it('cada resgate vai com uma chave de idempotência nova', async () => {
+  it('depois de um resgate concluído, o próximo do mesmo cupom vai com chave nova', async () => {
     comApi(fralda, 1000);
     mockPost.mockResolvedValue({ ...resgatado, saldo: 900 });
     await fireEvent.press(await abrirConfirmacao());
@@ -256,13 +256,43 @@ describe('resgate', () => {
     expect(chaveDoEnvio(1)).toBe(chaveDoEnvio(0));
   });
 
-  it('fechar depois da falha de rede e escolher o cupom de novo começa outro resgate, com chave nova', async () => {
+  it('fechar depois da falha de rede e reabrir o mesmo cupom repete a chave pendente', async () => {
     comApi(fralda, 150);
     mockPost.mockRejectedValueOnce(new TypeError('Network request failed')).mockResolvedValueOnce(resgatado);
     await fireEvent.press(await abrirConfirmacao());
     await fireEvent.press(await screen.findByRole('button', { name: 'Fechar' }));
 
     await fireEvent.press(botoesResgatar()[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+
+    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+    expect(chaveDoEnvio(1)).toBe(chaveDoEnvio(0));
+  });
+
+  it('com a chave de um cupom pendente, outro cupom vai com chave própria', async () => {
+    comApi(fralda, 1000);
+    mockPost.mockRejectedValueOnce(new ApiError(503)).mockResolvedValueOnce(resgatado);
+    await fireEvent.press(await abrirConfirmacao());
+    await fireEvent.press(await screen.findByRole('button', { name: 'Fechar' }));
+
+    await fireEvent.press(botoesResgatar()[1]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+
+    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+    expect(mockPost.mock.calls[1][0]).toBe('/cupons/10/resgatar');
+    expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
+  });
+
+  it.each([409, 400])('erro %p encerra o resgate: reabrir o mesmo cupom vai com chave nova', async (status) => {
+    comApi(fralda, 150);
+    mockPost.mockRejectedValueOnce(new ApiError(status)).mockResolvedValueOnce(resgatado);
+    await fireEvent.press(await abrirConfirmacao());
+    // 4xx é resposta definitiva: não oferece tentar de novo
+    await screen.findByText(/Cupom indisponível|Não foi possível resgatar/);
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Fechar' }));
+
+    await fireEvent.press((await screen.findAllByRole('button', { name: 'Resgatar' }))[0]);
     await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
 
     expect(await screen.findByText('ABCD2345')).toBeTruthy();
