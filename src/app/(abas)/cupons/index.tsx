@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Alerta } from '@/components/alerta';
 import { Botao } from '@/components/botao';
 import { Saldo, SecaoEmpresa } from '@/components/cupom';
-import { PainelFiltros } from '@/components/filtros-ofertas';
+import { FiltroCabeNoSaldo, PainelFiltros } from '@/components/filtros-ofertas';
 import { RodapePaginacao } from '@/components/rodape-paginacao';
 import { TelaLista } from '@/components/tela';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
@@ -82,7 +82,12 @@ export default function CuponsScreen() {
       cabecalho={
         <View style={styles.cabecalho}>
           {saldo !== undefined ? <Saldo saldo={saldo} /> : null}
-          <PainelFiltros busca={busca} onBusca={setBusca} filtros={filtros} onFiltros={setFiltros} />
+          <PainelFiltros busca={busca} onBusca={setBusca} filtros={filtros} onFiltros={setFiltros}>
+            <FiltroCabeNoSaldo
+              marcado={!!filtros.ateMeusPontos}
+              onChange={(marcado) => setFiltros({ ...filtros, ateMeusPontos: marcado || undefined })}
+            />
+          </PainelFiltros>
           {lista.erro ? <Alerta mensagem={lista.erro} /> : null}
           {lista.erro && !lista.itens ? (
             <Botao rotulo="Tentar de novo" estilo="secundario" onPress={recarregar} />

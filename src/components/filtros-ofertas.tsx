@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Campo } from '@/components/campo';
 import { Opcoes, type Opcao } from '@/components/opcoes';
 import { Cores, Espaco, Fontes, Raio } from '@/constants/theme';
-import { ROTULO_CATEGORIA, type Categoria, type FiltrosOfertas, type TipoOferta } from '@/lib/ofertas';
+import { ROTULO_CATEGORIA, type Categoria, type TipoOferta } from '@/lib/ofertas';
 
 const CATEGORIAS: Opcao<Categoria>[] = (Object.keys(ROTULO_CATEGORIA) as Categoria[]).map((valor) => ({
   valor,
@@ -15,22 +16,37 @@ const TIPOS: Opcao<TipoOferta>[] = [
   { valor: 'PROMOCAO', rotulo: 'Promoção' },
 ];
 
-export interface PainelFiltrosProps {
+// O que as duas telas filtram igual; cada uma acrescenta os próprios campos no mesmo objeto
+export interface FiltrosComuns {
+  categoria?: Categoria;
+  tipo?: TipoOferta;
+}
+
+export interface PainelFiltrosProps<F extends FiltrosComuns> {
   // O texto digitado; a tela aplica a busca com um atraso, para não buscar a cada letra
   busca: string;
   onBusca: (texto: string) => void;
-  filtros: Omit<FiltrosOfertas, 'busca'>;
-  onFiltros: (filtros: Omit<FiltrosOfertas, 'busca'>) => void;
+  filtros: F;
+  onFiltros: (filtros: F) => void;
+  placeholder?: string;
+  // O filtro que muda de uma tela para outra ("Cabe no meu saldo" na Loja, status nos resgatados), abaixo do tipo
+  children?: ReactNode;
 }
 
-export function PainelFiltros({ busca, onBusca, filtros, onFiltros }: PainelFiltrosProps) {
-  const cabe = !!filtros.ateMeusPontos;
-
+// Busca, categoria e tipo, comuns à Loja e aos cupons resgatados
+export function PainelFiltros<F extends FiltrosComuns>({
+  busca,
+  onBusca,
+  filtros,
+  onFiltros,
+  placeholder = 'Produto ou empresa',
+  children,
+}: PainelFiltrosProps<F>) {
   return (
     <View style={styles.filtros}>
       <Campo
         rotulo="Buscar"
-        placeholder="Produto ou empresa"
+        placeholder={placeholder}
         value={busca}
         onChangeText={onBusca}
         returnKeyType="search"
@@ -48,19 +64,31 @@ export function PainelFiltros({ busca, onBusca, filtros, onFiltros }: PainelFilt
         selecionada={filtros.tipo}
         onChange={(tipo) => onFiltros({ ...filtros, tipo })}
       />
-      <Pressable
-        accessibilityRole="checkbox"
-        accessibilityLabel="Cabe no meu saldo"
-        accessibilityState={{ checked: cabe }}
-        accessibilityHint="Mostra só os produtos com cupom que dá para resgatar com o seu saldo"
-        onPress={() => onFiltros({ ...filtros, ateMeusPontos: !cabe || undefined })}
-        style={styles.marcar}>
-        <View style={[styles.caixa, cabe && styles.caixaMarcada]}>
-          {cabe ? <Text style={styles.visto}>✓</Text> : null}
-        </View>
-        <Text style={styles.marcarTexto}>Cabe no meu saldo</Text>
-      </Pressable>
+      {children}
     </View>
+  );
+}
+
+export interface FiltroCabeNoSaldoProps {
+  marcado: boolean;
+  onChange: (marcado: boolean) => void;
+}
+
+// Só na Loja: nos resgatados os pontos já foram gastos
+export function FiltroCabeNoSaldo({ marcado, onChange }: FiltroCabeNoSaldoProps) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel="Cabe no meu saldo"
+      accessibilityState={{ checked: marcado }}
+      accessibilityHint="Mostra só os produtos com cupom que dá para resgatar com o seu saldo"
+      onPress={() => onChange(!marcado)}
+      style={styles.marcar}>
+      <View style={[styles.caixa, marcado && styles.caixaMarcada]}>
+        {marcado ? <Text style={styles.visto}>✓</Text> : null}
+      </View>
+      <Text style={styles.marcarTexto}>Cabe no meu saldo</Text>
+    </Pressable>
   );
 }
 
