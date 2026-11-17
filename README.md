@@ -9,6 +9,7 @@ os pontos por cupons de desconto das empresas parceiras.
 - [Expo SDK 58](https://docs.expo.dev) + React Native 0.88 + TypeScript
 - [Expo Router](https://docs.expo.dev/router/introduction) (rotas por arquivo em `src/app/`)
 - `expo-secure-store` para guardar a sessão; `expo-image-picker` para a foto do perfil
+- `expo-clipboard` para copiar o código do cupom; `react-native-qrcode-svg` (com `react-native-svg`) para o QR Code
 - Jest ([`jest-expo`](https://docs.expo.dev/develop/unit-testing/)) + Testing Library para testes
 - ESLint (`eslint-config-expo`)
 
@@ -19,12 +20,14 @@ os pontos por cupons de desconto das empresas parceiras.
 | `/`                    | Login (só contas de gestante)                                          |
 | `/primeiro-acesso`     | Troca da senha temporária, consentimento LGPD e dados socioeconômicos  |
 | `/tutorial`            | Apresentação do app no primeiro uso                                    |
-| `/inicio`              | Próximos exames e consultas e os já realizados                         |
-| `/pontos`              | Saldo e atividades que geraram pontos; `/pontos/extrato` com filtros   |
-| `/cupons`              | Ofertas das empresas parceiras, com filtros; abre `empresa/[id]` ("Ver todos") e `produto/[id]` (resgate de cupom com pontos e de promoção grátis, uma vez só) |
+| `/inicio`              | Próximos exames e consultas e os já realizados; puxar para recarregar  |
+| `/pontos`              | Saldo e atividades que geraram pontos, com puxar para recarregar; `/pontos/extrato` com filtros |
+| `/cupons`              | Aba "Loja Cupons": ofertas das empresas parceiras, com filtros; abre `empresa/[id]` ("Ver todos") e `produto/[id]` (resgate de cupom com pontos e de promoção grátis, uma vez só; o diálogo de sucesso tem "Ver código") |
+| `/cupons/resgatados`   | Aba "Cupons resgatados": cupons e promoções resgatados, com filtros de busca, categoria, tipo e status (ativo, utilizado, expirado); "Ver código" abre `resgatado/[id]` |
+| `/cupons/resgatado/[id]` | Código do resgate com Copiar e QR Code (só enquanto ativo), status, empresa, desconto, datas e pontos gastos |
 | `/perfil`              | Contato, foto e saída da conta                                         |
 
-As quatro últimas são as abas (`src/app/(abas)/`) e exigem sessão; sem token, o app volta para o login.
+`/inicio`, `/pontos`, `/cupons` e `/perfil` são as abas (`src/app/(abas)/`) e exigem sessão; sem token, o app volta para o login.
 
 ## Como rodar
 
