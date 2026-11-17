@@ -78,7 +78,7 @@ export default function CuponsScreen() {
   return (
     <TelaLista
       titulo="Cupons"
-      descricao="Troque seus pontos por cupons de desconto e veja as promoções das empresas parceiras."
+      descricao="Troque seus pontos por cupons de desconto e resgate grátis as promoções das empresas parceiras."
       cabecalho={
         <View style={styles.cabecalho}>
           {saldo !== undefined ? <Saldo saldo={saldo} /> : null}

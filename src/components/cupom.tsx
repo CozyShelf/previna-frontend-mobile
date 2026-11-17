@@ -188,19 +188,34 @@ export function CartaoCupom({ cupom, saldo, onResgatar }: CartaoCupomProps) {
   );
 }
 
-// Promoção é informativa: desconto direto na loja, sem pontos e sem código
-export function CartaoPromocao({ promocao }: { promocao: PromocaoOferta }) {
+interface CartaoPromocaoProps {
+  promocao: PromocaoOferta;
+  onResgatar: (promocao: PromocaoOferta) => void;
+}
+
+// Uma promoção do produto: resgate grátis, sem gastar pontos, e uma vez só. Depois do resgate o botão fica
+// desabilitado
+export function CartaoPromocao({ promocao, onResgatar }: CartaoPromocaoProps) {
   const validade = `Válida até ${formatarData(promocao.dataFim)}`;
+  const resgatada = !!promocao.resgatada;
 
   return (
-    <View
-      style={styles.cartao}
-      accessible
-      accessibilityLabel={`Promoção de ${formatarDesconto(promocao.desconto)} de desconto: ${promocao.titulo}, ${validade}`}>
-      <Selo texto={`Promoção ${formatarDesconto(promocao.desconto)}`} />
-      <Text style={styles.cartaoTitulo}>{promocao.titulo}</Text>
-      <Text style={styles.detalhe}>{validade}</Text>
-      <Text style={styles.detalhe}>Desconto direto na loja, sem gastar pontos.</Text>
+    <View style={styles.cartao}>
+      <View
+        style={styles.textos}
+        accessible
+        accessibilityLabel={`Promoção de ${formatarDesconto(promocao.desconto)} de desconto: ${promocao.titulo}, ${validade}, grátis, não usa seus pontos`}>
+        <Selo texto={`Promoção ${formatarDesconto(promocao.desconto)}`} />
+        <Text style={styles.cartaoTitulo}>{promocao.titulo}</Text>
+        <Text style={styles.detalhe}>{validade}</Text>
+        <Text style={styles.gratis}>Grátis — não usa seus pontos</Text>
+      </View>
+      <Botao
+        rotulo={resgatada ? 'Já resgatada' : 'Resgatar'}
+        estilo="primario"
+        desabilitado={resgatada}
+        onPress={() => onResgatar(promocao)}
+      />
     </View>
   );
 }
@@ -372,6 +387,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 24,
     color: Cores.texto,
+  },
+  gratis: {
+    fontFamily: Fontes.media,
+    fontSize: 14,
+    color: Cores.previna700,
   },
   faltam: {
     fontFamily: Fontes.media,

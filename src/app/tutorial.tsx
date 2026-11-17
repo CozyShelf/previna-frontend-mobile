@@ -33,7 +33,7 @@ const ETAPAS = [
   {
     titulo: 'Troque por cupons',
     descricao:
-      'Use seus pontos para resgatar cupons de produtos e promoções das empresas parceiras.',
+      'Use seus pontos para resgatar cupons de produtos. As promoções das empresas parceiras são grátis.',
     cor: '#7c3aed',
     imagem: require('@/assets/images/tutorial-cupons.png'),
   },

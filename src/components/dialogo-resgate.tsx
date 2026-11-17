@@ -4,17 +4,20 @@ import { Alerta } from '@/components/alerta';
 import { Botao } from '@/components/botao';
 import { formatarData, formatarDesconto, formatarPontos } from '@/components/cupom';
 import { Cores, Espaco, Fontes, Raio } from '@/constants/theme';
-import type { CupomOferta } from '@/lib/ofertas';
+import type { CupomOferta, PromocaoOferta, TipoOferta } from '@/lib/ofertas';
 
-// Mesmo formato do CupomResgatadoResponse no backend
+// Mesmo formato do CupomResgatadoResponse no backend, que responde tanto o resgate de cupom quanto o de promoção
 export interface CupomResgatado {
   id: number;
   codigo: string;
   descricao: string;
   empresa: string;
   dataValidade: string;
+  // Zero na promoção, que não gasta pontos
   pontosGastos: number;
   saldo: number;
+  // Opcional enquanto houver backend sem o campo: o app sabe o que resgatou pela oferta escolhida
+  tipo?: TipoOferta;
 }
 
 // O cupom escolhido no detalhe do produto, com os nomes que a confirmação mostra
@@ -23,9 +26,18 @@ export interface CupomParaResgate extends CupomOferta {
   empresa: string;
 }
 
+// A promoção escolhida, idem
+export interface PromocaoParaResgate extends PromocaoOferta {
+  produto: string;
+  empresa: string;
+}
+
+// O que vai ser resgatado: cupom (gasta pontos) ou promoção (grátis, uma vez só)
+export type OfertaParaResgate = ({ tipo: 'CUPOM' } & CupomParaResgate) | ({ tipo: 'PROMOCAO' } & PromocaoParaResgate);
+
 export interface DialogoResgateProps {
-  // Sem cupom, o diálogo fica fechado
-  cupom?: CupomParaResgate;
+  // Sem oferta, o diálogo fica fechado
+  oferta?: OfertaParaResgate;
   saldo: number;
   resgatado?: CupomResgatado;
   erro?: string;
@@ -36,9 +48,9 @@ export interface DialogoResgateProps {
   onFechar: () => void;
 }
 
-// Pede a confirmação antes de gastar os pontos e, depois, mostra o código que a gestante apresenta na loja
+// Pede a confirmação antes de resgatar e, depois, mostra o código que a gestante apresenta na loja
 export function DialogoResgate({
-  cupom,
+  oferta,
   saldo,
   resgatado,
   erro,
@@ -48,24 +60,29 @@ export function DialogoResgate({
   onFechar,
 }: DialogoResgateProps) {
   return (
-    <Modal visible={!!cupom} transparent animationType="fade" onRequestClose={enviando ? undefined : onFechar}>
+    <Modal visible={!!oferta} transparent animationType="fade" onRequestClose={enviando ? undefined : onFechar}>
       <View style={styles.fundo}>
         {/* Toque fora fecha, menos durante o envio */}
         <Pressable style={StyleSheet.absoluteFill} onPress={enviando ? undefined : onFechar} accessible={false} />
-        {cupom && (
+        {oferta && (
           <View style={styles.caixa} accessibilityViewIsModal>
             {resgatado ? (
-              <Sucesso resgatado={resgatado} onFechar={onFechar} />
+              <Sucesso tipo={oferta.tipo} resgatado={resgatado} onFechar={onFechar} />
             ) : (
-              <Confirmacao
-                cupom={cupom}
-                saldo={saldo}
-                erro={erro}
-                podeTentarDeNovo={podeTentarDeNovo}
-                enviando={enviando}
-                onConfirmar={onConfirmar}
-                onFechar={onFechar}
-              />
+              <>
+                {oferta.tipo === 'CUPOM' ? (
+                  <ConfirmacaoCupom cupom={oferta} saldo={saldo} />
+                ) : (
+                  <ConfirmacaoPromocao promocao={oferta} saldo={saldo} />
+                )}
+                <Acoes
+                  erro={erro}
+                  podeTentarDeNovo={podeTentarDeNovo}
+                  enviando={enviando}
+                  onConfirmar={onConfirmar}
+                  onFechar={onFechar}
+                />
+              </>
             )}
           </View>
         )}
@@ -74,17 +91,7 @@ export function DialogoResgate({
   );
 }
 
-interface ConfirmacaoProps {
-  cupom: CupomParaResgate;
-  saldo: number;
-  erro?: string;
-  podeTentarDeNovo?: boolean;
-  enviando: boolean;
-  onConfirmar: () => void;
-  onFechar: () => void;
-}
-
-function Confirmacao({ cupom, saldo, erro, podeTentarDeNovo, enviando, onConfirmar, onFechar }: ConfirmacaoProps) {
+function ConfirmacaoCupom({ cupom, saldo }: { cupom: CupomParaResgate; saldo: number }) {
   return (
     <>
       <Text style={styles.titulo} accessibilityRole="header">
@@ -101,12 +108,49 @@ function Confirmacao({ cupom, saldo, erro, podeTentarDeNovo, enviando, onConfirm
         <View style={styles.divisor} />
         <Linha rotulo="Saldo depois do resgate" valor={formatarPontos(saldo - cupom.pontosNecessarios)} destaque />
       </View>
+    </>
+  );
+}
 
+// A promoção não custa pontos: o resumo deixa claro que o saldo continua o mesmo
+function ConfirmacaoPromocao({ promocao, saldo }: { promocao: PromocaoParaResgate; saldo: number }) {
+  return (
+    <>
+      <Text style={styles.titulo} accessibilityRole="header">
+        Resgatar promoção?
+      </Text>
+      <Text style={styles.texto}>
+        {promocao.titulo}: {formatarDesconto(promocao.desconto)} de desconto na {promocao.empresa}. Válida até{' '}
+        {formatarData(promocao.dataFim)}.
+      </Text>
+
+      <View style={styles.resumo}>
+        <Linha rotulo="Custo" valor="Grátis" />
+        <View style={styles.divisor} />
+        <Linha rotulo="Seu saldo continua" valor={formatarPontos(saldo)} destaque />
+      </View>
+
+      <Text style={styles.texto}>Você só pode resgatar esta promoção uma vez.</Text>
+    </>
+  );
+}
+
+interface AcoesProps {
+  erro?: string;
+  podeTentarDeNovo?: boolean;
+  enviando: boolean;
+  onConfirmar: () => void;
+  onFechar: () => void;
+}
+
+function Acoes({ erro, podeTentarDeNovo, enviando, onConfirmar, onFechar }: AcoesProps) {
+  return (
+    <>
       {erro && <Alerta mensagem={erro} />}
 
       <View style={styles.botoes}>
-        {/* Depois de um erro (cupom saiu do ar, saldo mudou) não adianta tentar de novo: só fechar. Na falha de
-            rede, sim: a nova tentativa vai com a mesma chave e não debita duas vezes */}
+        {/* Depois de um erro (oferta saiu do ar, saldo mudou, promoção já resgatada) não adianta tentar de novo: só
+            fechar. Na falha de rede, sim: a nova tentativa vai com a mesma chave e não resgata duas vezes */}
         {(!erro || podeTentarDeNovo) && (
           <Botao
             rotulo={enviando ? 'Resgatando…' : erro ? 'Tentar de novo' : 'Confirmar resgate'}
@@ -121,28 +165,41 @@ function Confirmacao({ cupom, saldo, erro, podeTentarDeNovo, enviando, onConfirm
   );
 }
 
-function Sucesso({ resgatado, onFechar }: { resgatado: CupomResgatado; onFechar: () => void }) {
+interface SucessoProps {
+  tipo: TipoOferta;
+  resgatado: CupomResgatado;
+  onFechar: () => void;
+}
+
+function Sucesso({ tipo, resgatado, onFechar }: SucessoProps) {
+  const cupom = tipo === 'CUPOM';
+  const rotuloCodigo = cupom ? 'Código do cupom' : 'Código da promoção';
   return (
     <>
       <Text style={styles.titulo} accessibilityRole="header" accessibilityLiveRegion="polite">
-        Cupom resgatado!
+        {cupom ? 'Cupom resgatado!' : 'Promoção resgatada!'}
       </Text>
       <Text style={styles.texto}>
         Mostre este código no caixa da {resgatado.empresa} para ganhar {resgatado.descricao}.
       </Text>
 
-      <View style={styles.codigoCaixa} accessible accessibilityLabel={`Código do cupom: ${resgatado.codigo.split('').join(' ')}`}>
-        <Text style={styles.codigoRotulo}>Código do cupom</Text>
+      <View style={styles.codigoCaixa} accessible accessibilityLabel={`${rotuloCodigo}: ${resgatado.codigo.split('').join(' ')}`}>
+        <Text style={styles.codigoRotulo}>{rotuloCodigo}</Text>
         <Text style={styles.codigo} selectable>
           {resgatado.codigo}
         </Text>
         <Text style={styles.codigoRotulo}>Válido até {formatarData(resgatado.dataValidade)}</Text>
       </View>
 
-      <View style={styles.resumo}>
-        <Linha rotulo="Pontos usados" valor={formatarPontos(resgatado.pontosGastos)} />
-        <Linha rotulo="Novo saldo" valor={formatarPontos(resgatado.saldo)} destaque />
-      </View>
+      {/* A promoção não gasta pontos: nada de "pontos usados" nem saldo novo */}
+      {cupom ? (
+        <View style={styles.resumo}>
+          <Linha rotulo="Pontos usados" valor={formatarPontos(resgatado.pontosGastos)} />
+          <Linha rotulo="Novo saldo" valor={formatarPontos(resgatado.saldo)} destaque />
+        </View>
+      ) : (
+        <Text style={styles.texto}>Grátis: seus pontos continuam os mesmos.</Text>
+      )}
 
       <Botao rotulo="Concluir" estilo="primario" onPress={onFechar} />
     </>

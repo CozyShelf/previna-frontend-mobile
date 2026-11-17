@@ -194,17 +194,43 @@ describe('CartaoCupom', () => {
   });
 });
 
-it('CartaoPromocao mostra percentual, título e validade, sem pontos', async () => {
-  await render(
-    <CartaoPromocao
-      promocao={{ id: 3, titulo: 'Semana do bebê', desconto: 15, dataInicio: '2026-11-01', dataFim: '2026-11-30' }}
-    />,
-  );
+describe('CartaoPromocao', () => {
+  const promocao = { id: 3, titulo: 'Semana do bebê', desconto: 15, dataInicio: '2026-11-01', dataFim: '2026-11-30' };
 
-  expect(screen.getByText('Promoção 15%')).toBeTruthy();
-  expect(screen.getByText('Semana do bebê')).toBeTruthy();
-  expect(screen.getByText('Válida até 30/11/2026')).toBeTruthy();
-  expect(screen.getByText(/sem gastar pontos/)).toBeTruthy();
+  it('mostra percentual, título, validade e que é grátis; resgatar avisa a tela', async () => {
+    const onResgatar = jest.fn();
+    await render(<CartaoPromocao promocao={{ ...promocao, resgatada: false }} onResgatar={onResgatar} />);
+
+    expect(screen.getByText('Promoção 15%')).toBeTruthy();
+    expect(screen.getByText('Semana do bebê')).toBeTruthy();
+    expect(screen.getByText('Válida até 30/11/2026')).toBeTruthy();
+    expect(screen.getByText('Grátis — não usa seus pontos')).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        'Promoção de 15% de desconto: Semana do bebê, Válida até 30/11/2026, grátis, não usa seus pontos',
+      ),
+    ).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Resgatar' }));
+    expect(onResgatar).toHaveBeenCalledWith({ ...promocao, resgatada: false });
+  });
+
+  it('sem o campo resgatada (backend antigo) continua resgatável', async () => {
+    await render(<CartaoPromocao promocao={promocao} onResgatar={jest.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Resgatar' })).toBeEnabled();
+  });
+
+  it('já resgatada fica desabilitada e não resgata de novo', async () => {
+    const onResgatar = jest.fn();
+    await render(<CartaoPromocao promocao={{ ...promocao, resgatada: true }} onResgatar={onResgatar} />);
+
+    const botao = screen.getByRole('button', { name: 'Já resgatada' });
+    expect(botao).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Resgatar' })).toBeNull();
+    await fireEvent.press(botao);
+    expect(onResgatar).not.toHaveBeenCalled();
+  });
 });
 
 it('OfertaAusente aparece desabilitada', async () => {
