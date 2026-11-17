@@ -206,7 +206,8 @@ function Sucesso({ tipo, resgatado, onFechar }: SucessoProps) {
   );
 }
 
-function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
+// Uma linha de resumo (rótulo à esquerda, valor à direita), usada também no detalhe do resgate
+export function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
   return (
     <View style={styles.linha}>
       <Text style={[styles.linhaRotulo, destaque && styles.linhaDestaque]}>{rotulo}</Text>
@@ -265,6 +266,8 @@ const styles = StyleSheet.create({
     color: Cores.textoSecundario,
   },
   linhaValor: {
+    flexShrink: 1,
+    textAlign: 'right',
     fontFamily: Fontes.media,
     fontSize: 14,
     color: Cores.texto,
