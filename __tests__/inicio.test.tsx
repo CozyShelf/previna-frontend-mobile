@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, userEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import InicioScreen from '@/app/(abas)/inicio';
@@ -230,4 +230,51 @@ it('erro de um sorteio já trocado não aparece', async () => {
 
   await act(async () => falharAntigo(new Error('atrasado')));
   expect(screen.queryByText(/Não foi possível carregar os conteúdos/)).toBeNull();
+});
+
+describe('puxar para recarregar', () => {
+  const pedidos = (prefixo: string) =>
+    mockGet.mock.calls.map(([caminho]) => caminho as string).filter((c) => c.startsWith(prefixo));
+
+  it('busca as consultas e sorteia os conteúdos de novo', async () => {
+    comApi([agendamento(1, 'Ultrassom')], [conteudo(7, 'Sono')]);
+    await render(<InicioScreen />);
+    await screen.findByText('Sono');
+    const consultasAntes = pedidos('/gestantes').length;
+    const conteudosAntes = pedidos('/conteudos');
+
+    comApi([agendamento(1, 'Ultrassom'), agendamento(2, 'Hemograma')], [conteudo(8, 'Alimentação')]);
+    await userEvent.setup().pullToRefresh(screen.getByTestId('tela'));
+
+    expect(await screen.findByText('Hemograma')).toBeTruthy();
+    expect(await screen.findByText('Alimentação')).toBeTruthy();
+    expect(pedidos('/gestantes')).toHaveLength(consultasAntes + 1);
+    expect(pedidos('/conteudos')).toHaveLength(conteudosAntes.length + 1);
+    expect(pedidos('/conteudos').at(-1)).not.toBe(conteudosAntes.at(-1));
+  });
+
+  it('o indicador fica até as consultas e os conteúdos chegarem', async () => {
+    comApi([], [conteudo(7, 'Sono')]);
+    await render(<InicioScreen />);
+    await screen.findByText('Sono');
+
+    let responderConsultas: (v: unknown) => void = () => {};
+    let responderConteudos: (v: unknown) => void = () => {};
+    mockGet.mockImplementation((caminho: string) =>
+      caminho.startsWith('/gestantes')
+        ? new Promise((resolve) => (responderConsultas = resolve))
+        : new Promise((resolve) => (responderConteudos = resolve)),
+    );
+    const recarregando = () => screen.getByTestId('tela').props.refreshControl.props.refreshing;
+
+    await act(async () => screen.getByTestId('tela').props.refreshControl.props.onRefresh());
+    expect(recarregando()).toBe(true);
+
+    await act(async () => responderConsultas([]));
+    expect(recarregando()).toBe(true);
+
+    await act(async () => responderConteudos(pagina([conteudo(8, 'Alimentação')])));
+    expect(recarregando()).toBe(false);
+    expect(screen.getByText('Alimentação')).toBeTruthy();
+  });
 });

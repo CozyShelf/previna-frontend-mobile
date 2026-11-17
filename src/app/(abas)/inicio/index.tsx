@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { SecaoAgendamentos, type Agendamento } from '@/components/agendamento';
@@ -26,6 +26,10 @@ export default function InicioScreen() {
   const [erroConsultas, setErroConsultas] = useState<string>();
   const [erroConteudos, setErroConteudos] = useState<string>();
   const [semente, setSemente] = useState(novaSemente);
+  const [recarregando, setRecarregando] = useState(false);
+  // Puxar para recarregar espera também os conteúdos, que chegam pelo efeito da semente: o efeito avisa aqui
+  // quando o sorteio em andamento termina (o último, se a semente tiver mudado de novo no caminho)
+  const fimDoSorteio = useRef<() => void>(undefined);
 
   // Chegar aqui significa primeiro acesso e tutorial concluídos
   useEffect(() => {
@@ -34,9 +38,8 @@ export default function InicioScreen() {
 
   // Recarrega ao voltar para a aba: o médico pode ter confirmado uma consulta nesse meio-tempo,
   // e o sorteio dos conteúdos é refeito
-  useFocusEffect(
-    useCallback(() => {
-      setSemente(novaSemente());
+  const carregarConsultas = useCallback(
+    () =>
       get<Agendamento[]>('/gestantes/agendamentos?pendentes=true')
         .then((dados) => {
           setPendentes(dados);
@@ -46,9 +49,24 @@ export default function InicioScreen() {
           setErroConsultas(
             'Não foi possível carregar seus exames e consultas. Verifique sua conexão.',
           ),
-        );
-    }, []),
+        ),
+    [],
   );
+
+  useFocusEffect(
+    useCallback(() => {
+      setSemente(novaSemente());
+      void carregarConsultas();
+    }, [carregarConsultas]),
+  );
+
+  // Puxar para recarregar: as consultas e um novo sorteio de conteúdos, como ao voltar para a aba
+  function recarregar() {
+    setRecarregando(true);
+    const conteudosProntos = new Promise<void>((resolve) => (fimDoSorteio.current = resolve));
+    setSemente(novaSemente());
+    void Promise.all([carregarConsultas(), conteudosProntos]).finally(() => setRecarregando(false));
+  }
 
   // Separado do bloco acima: trocar a semente sozinha também sorteia de novo
   useEffect(() => {
@@ -65,7 +83,13 @@ export default function InicioScreen() {
         () =>
           atual &&
           setErroConteudos('Não foi possível carregar os conteúdos. Verifique sua conexão.'),
-      );
+      )
+      .finally(() => {
+        if (atual) {
+          fimDoSorteio.current?.();
+          fimDoSorteio.current = undefined;
+        }
+      });
     return () => {
       atual = false;
     };
@@ -79,7 +103,9 @@ export default function InicioScreen() {
       titulo="Meus exames e consultas"
       descricao="O que seu médico marcou e ainda não confirmou, e conteúdos para acompanhar a gestação."
       alinharTopo
-      edges={['top', 'left', 'right']}>
+      edges={['top', 'left', 'right']}
+      recarregando={recarregando}
+      onRecarregar={recarregar}>
       <View style={styles.blocos}>
         <View style={styles.bloco}>
           {erroConsultas ? <Alerta mensagem={erroConsultas} /> : null}

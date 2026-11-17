@@ -22,9 +22,12 @@ export interface TelaProps {
   edges?: Edge[];
   // Listas começam no topo; as telas de autenticação seguem centralizadas
   alinharTopo?: boolean;
+  // Puxar para recarregar, com o mesmo visual da TelaLista; sem onRecarregar a tela só rola
+  recarregando?: boolean;
+  onRecarregar?: () => void;
 }
 
-export function Tela({ titulo, descricao, children, edges, alinharTopo }: TelaProps) {
+export function Tela({ titulo, descricao, children, edges, alinharTopo, recarregando, onRecarregar }: TelaProps) {
   return (
     <SafeAreaView style={styles.area} edges={edges}>
       {/* Android edge-to-edge não redimensiona a tela com o teclado; no iOS o ScrollView ajusta o inset e rola até o campo */}
@@ -32,9 +35,13 @@ export function Tela({ titulo, descricao, children, edges, alinharTopo }: TelaPr
         style={styles.area}
         behavior={Platform.OS === 'android' ? 'padding' : undefined}>
         <ScrollView
+          testID="tela"
           contentContainerStyle={[styles.conteudo, alinharTopo && styles.noTopo]}
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets>
+          automaticallyAdjustKeyboardInsets
+          refreshControl={
+            onRecarregar ? controleRecarga(!!recarregando, onRecarregar) : undefined
+          }>
           <View style={styles.coluna}>
             <Logo />
             <View style={styles.cabecalho}>
@@ -48,6 +55,19 @@ export function Tela({ titulo, descricao, children, edges, alinharTopo }: TelaPr
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+// O mesmo indicador nas duas telas, na cor da marca. É uma função, e não um componente: no Android o ScrollView
+// clona o próprio RefreshControl e o põe em volta da lista, e um componente intermediário não repassaria isso
+function controleRecarga(recarregando: boolean, onRecarregar: () => void) {
+  return (
+    <RefreshControl
+      refreshing={recarregando}
+      onRefresh={onRecarregar}
+      tintColor={Cores.previna600}
+      colors={[Cores.previna600]}
+    />
   );
 }
 
@@ -100,14 +120,7 @@ export function TelaLista<T>({
         contentContainerStyle={[styles.conteudo, styles.noTopo]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        refreshControl={
-          <RefreshControl
-            refreshing={recarregando}
-            onRefresh={onRecarregar}
-            tintColor={Cores.previna600}
-            colors={[Cores.previna600]}
-          />
-        }
+        refreshControl={controleRecarga(recarregando, onRecarregar)}
         ListHeaderComponent={
           <View style={[styles.coluna, styles.listaCabecalho]}>
             <Logo />

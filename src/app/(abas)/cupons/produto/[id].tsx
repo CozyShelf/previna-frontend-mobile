@@ -165,6 +165,12 @@ export default function ProdutoScreen() {
     setErroResgate(undefined);
   }
 
+  // Fecha o diálogo e abre o detalhe do resgate, com o QR Code; voltar de lá traz para este produto
+  function verCodigo(cupom: CupomResgatado) {
+    fechar();
+    router.push({ pathname: '/cupons/resgatado/[id]', params: { id: String(cupom.id) } });
+  }
+
   const categoria = produto?.categoria ? ROTULO_CATEGORIA[produto.categoria] : undefined;
 
   return (
@@ -225,6 +231,7 @@ export default function ProdutoScreen() {
         enviando={enviando}
         onConfirmar={() => void resgatar()}
         onFechar={fechar}
+        onVerCodigo={verCodigo}
       />
     </Tela>
   );

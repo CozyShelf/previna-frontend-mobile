@@ -46,6 +46,8 @@ export interface DialogoResgateProps {
   enviando: boolean;
   onConfirmar: () => void;
   onFechar: () => void;
+  // Depois do resgate: abre o detalhe com o código e o QR Code
+  onVerCodigo: (resgatado: CupomResgatado) => void;
 }
 
 // Pede a confirmação antes de resgatar e, depois, mostra o código que a gestante apresenta na loja
@@ -58,6 +60,7 @@ export function DialogoResgate({
   enviando,
   onConfirmar,
   onFechar,
+  onVerCodigo,
 }: DialogoResgateProps) {
   return (
     <Modal visible={!!oferta} transparent animationType="fade" onRequestClose={enviando ? undefined : onFechar}>
@@ -67,7 +70,7 @@ export function DialogoResgate({
         {oferta && (
           <View style={styles.caixa} accessibilityViewIsModal>
             {resgatado ? (
-              <Sucesso tipo={oferta.tipo} resgatado={resgatado} onFechar={onFechar} />
+              <Sucesso tipo={oferta.tipo} resgatado={resgatado} onFechar={onFechar} onVerCodigo={onVerCodigo} />
             ) : (
               <>
                 {oferta.tipo === 'CUPOM' ? (
@@ -169,9 +172,10 @@ interface SucessoProps {
   tipo: TipoOferta;
   resgatado: CupomResgatado;
   onFechar: () => void;
+  onVerCodigo: (resgatado: CupomResgatado) => void;
 }
 
-function Sucesso({ tipo, resgatado, onFechar }: SucessoProps) {
+function Sucesso({ tipo, resgatado, onFechar, onVerCodigo }: SucessoProps) {
   const cupom = tipo === 'CUPOM';
   const rotuloCodigo = cupom ? 'Código do cupom' : 'Código da promoção';
   return (
@@ -201,12 +205,18 @@ function Sucesso({ tipo, resgatado, onFechar }: SucessoProps) {
         <Text style={styles.texto}>Grátis: seus pontos continuam os mesmos.</Text>
       )}
 
-      <Botao rotulo="Concluir" estilo="primario" onPress={onFechar} />
+      {/* O detalhe tem o QR Code; depois a gestante encontra o mesmo código em "Cupons resgatados" */}
+      <View style={styles.botoes}>
+        <Botao rotulo="Ver código" estilo="primario" onPress={() => onVerCodigo(resgatado)} />
+        <Botao rotulo="Concluir" estilo="secundario" onPress={onFechar} />
+      </View>
+      <Text style={styles.dica}>Você também encontra este código em Cupons resgatados.</Text>
     </>
   );
 }
 
-function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
+// Uma linha de resumo (rótulo à esquerda, valor à direita), usada também no detalhe do resgate
+export function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
   return (
     <View style={styles.linha}>
       <Text style={[styles.linhaRotulo, destaque && styles.linhaDestaque]}>{rotulo}</Text>
@@ -265,6 +275,8 @@ const styles = StyleSheet.create({
     color: Cores.textoSecundario,
   },
   linhaValor: {
+    flexShrink: 1,
+    textAlign: 'right',
     fontFamily: Fontes.media,
     fontSize: 14,
     color: Cores.texto,
@@ -275,6 +287,13 @@ const styles = StyleSheet.create({
   },
   botoes: {
     gap: Espaco.dois,
+  },
+  dica: {
+    fontFamily: Fontes.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    color: Cores.textoSecundario,
   },
   codigoCaixa: {
     alignItems: 'center',

@@ -30,7 +30,7 @@ jest.mock('@/lib/api', () => {
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react');
   return {
-    router: { back: jest.fn() },
+    router: { back: jest.fn(), push: jest.fn() },
     useLocalSearchParams: jest.fn(),
     useFocusEffect: (efeito: () => void) => useEffect(() => efeito(), [efeito]),
   };
@@ -615,5 +615,29 @@ describe('resgate de promoção', () => {
     ]);
     expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
     expect(chaveDoEnvio(2)).toBe(chaveDoEnvio(0));
+  });
+});
+
+describe('depois de resgatar', () => {
+  it('"Ver código" fecha o diálogo e abre o detalhe do cupom resgatado', async () => {
+    comApi(fralda, 150);
+    mockPost.mockResolvedValue(resgatado);
+    await fireEvent.press(await abrirConfirmacao());
+
+    expect(await screen.findByText('Você também encontra este código em Cupons resgatados.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Ver código' }));
+
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/cupons/resgatado/[id]', params: { id: '1' } });
+    expect(screen.queryByText('ABCD2345')).toBeNull();
+  });
+
+  it('"Ver código" da promoção abre o detalhe pelo id do resgate', async () => {
+    mockPost.mockResolvedValue(promocaoResgatada);
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Ver código' }));
+
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/cupons/resgatado/[id]', params: { id: '2' } });
+    expect(screen.getByRole('button', { name: 'Já resgatada' })).toBeDisabled();
   });
 });

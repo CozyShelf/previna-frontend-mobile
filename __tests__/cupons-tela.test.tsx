@@ -22,7 +22,7 @@ jest.mock('@/lib/api', () => {
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react');
   return {
-    router: { push: jest.fn() },
+    router: { push: jest.fn(), replace: jest.fn() },
     useFocusEffect: (efeito: () => void) => useEffect(() => efeito(), [efeito]),
   };
 });
@@ -75,6 +75,18 @@ beforeEach(() => {
 });
 
 describe('carregamento', () => {
+  it('mostra as abas com a Loja ativa e troca para os resgatados sem empilhar', async () => {
+    comApi(() => pagina([empresa(1)]));
+    await render(<CuponsScreen />);
+    await screen.findByText('Empresa 1');
+
+    expect(screen.getByRole('tab', { name: 'Loja Cupons' })).toBeSelected();
+    expect(screen.getByRole('tab', { name: 'Cupons resgatados' })).not.toBeSelected();
+    await fireEvent.press(screen.getByRole('tab', { name: 'Cupons resgatados' }));
+    expect(router.replace).toHaveBeenCalledWith('/cupons/resgatados');
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it('mostra o saldo e as empresas com os produtos', async () => {
     comApi(() => pagina([empresa(1), empresa(2)]));
     await render(<CuponsScreen />);
@@ -217,6 +229,9 @@ describe('filtros', () => {
     await fireEvent.press(screen.getByRole('checkbox', { name: 'Cabe no meu saldo' }));
     await fireEvent.press(screen.getByRole('radio', { name: 'Roupas' }));
     expect(chamadasOfertas().at(-1)).toBe('/ofertas?tipo=PROMOCAO&pagina=0&tamanho=10');
+    // O status é só dos resgatados
+    expect(screen.queryByRole('radiogroup', { name: 'Status' })).toBeNull();
+    expect(chamadasOfertas().join(' ')).not.toContain('status=');
   });
 
   describe('busca', () => {

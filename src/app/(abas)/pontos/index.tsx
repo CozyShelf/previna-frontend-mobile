@@ -27,25 +27,40 @@ const CATEGORIAS = { EXAME: 'Exame', CONSULTA: 'Consulta' };
 export default function PontuacaoScreen() {
   const [pontuacao, setPontuacao] = useState<Pontuacao>();
   const [erro, setErro] = useState<string>();
+  const [recarregando, setRecarregando] = useState(false);
 
-  // Recarrega ao voltar para a aba: o médico pode ter confirmado uma consulta nesse meio-tempo
-  useFocusEffect(
-    useCallback(() => {
+  const carregar = useCallback(
+    () =>
       get<Pontuacao>('/gestantes/pontuacao')
         .then((dados) => {
           setPontuacao(dados);
           setErro(undefined);
         })
-        .catch(() => setErro('Não foi possível carregar seus pontos. Verifique sua conexão.'));
-    }, []),
+        .catch(() => setErro('Não foi possível carregar seus pontos. Verifique sua conexão.')),
+    [],
   );
+
+  // Recarrega ao voltar para a aba: o médico pode ter confirmado uma consulta nesse meio-tempo
+  useFocusEffect(
+    useCallback(() => {
+      void carregar();
+    }, [carregar]),
+  );
+
+  // Puxar para recarregar: o indicador some quando a resposta chega, com sucesso ou erro
+  function recarregar() {
+    setRecarregando(true);
+    void carregar().finally(() => setRecarregando(false));
+  }
 
   return (
     <Tela
       titulo="Minha pontuação"
       descricao="Você ganha pontos a cada consulta e exame do pré-natal e pode trocá-los por cupons."
       alinharTopo
-      edges={['top', 'left', 'right']}>
+      edges={['top', 'left', 'right']}
+      recarregando={recarregando}
+      onRecarregar={recarregar}>
       {erro && <Alerta mensagem={erro} />}
       {pontuacao && (
         <View style={styles.conteudo}>
