@@ -11,10 +11,12 @@ jest.mock('@/lib/api', () => {
   class ApiError extends Error {
     status: number;
     mensagem?: string;
-    constructor(codigo: number, texto?: string) {
-      super(`Erro ${codigo}`);
-      this.status = codigo;
+    codigo?: string;
+    constructor(status: number, texto?: string, codigo?: string) {
+      super(`Erro ${status}`);
+      this.status = status;
       this.mensagem = texto;
+      this.codigo = codigo;
     }
   }
   return {
@@ -310,9 +312,12 @@ describe('resgate', () => {
     expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
   });
 
-  it.each([409, 400])('erro %p encerra o resgate: reabrir o mesmo cupom vai com chave nova', async (status) => {
+  it.each([
+    [409, 'CUPOM_INDISPONIVEL'],
+    [400, undefined],
+  ])('erro %p encerra o resgate: reabrir o mesmo cupom vai com chave nova', async (status, codigo) => {
     comApi(fralda, 150);
-    mockPost.mockRejectedValueOnce(new ApiError(status)).mockResolvedValueOnce(resgatado);
+    mockPost.mockRejectedValueOnce(new ApiError(status, undefined, codigo)).mockResolvedValueOnce(resgatado);
     await fireEvent.press(await abrirConfirmacao());
     // 4xx é resposta definitiva: não oferece tentar de novo
     await screen.findByText(/Cupom indisponível|Não foi possível resgatar/);
@@ -336,12 +341,12 @@ describe('resgate', () => {
   });
 
   it.each([
-    [409, 'Pontos insuficientes'],
-    [409, 'Cupom indisponível'],
-    [404, 'Cupom não encontrado'],
-  ])('erro %p "%s" mostra a mensagem da API, recarrega o produto e não oferece tentar de novo', async (status, mensagem) => {
+    [409, 'Pontos insuficientes', 'PONTOS_INSUFICIENTES'],
+    [409, 'Cupom indisponível', 'CUPOM_INDISPONIVEL'],
+    [404, 'Cupom não encontrado', undefined],
+  ])('erro %p "%s" mostra a mensagem da API, recarrega o produto e não oferece tentar de novo', async (status, mensagem, codigo) => {
     comApi(fralda, 150);
-    mockPost.mockRejectedValue(new ApiError(status, mensagem));
+    mockPost.mockRejectedValue(new ApiError(status, mensagem, codigo));
     await fireEvent.press(await abrirConfirmacao());
 
     expect(await screen.findByText(`${mensagem}. As ofertas deste produto foram atualizadas.`)).toBeTruthy();
@@ -355,7 +360,7 @@ describe('resgate', () => {
 
   it('409 sem mensagem usa "Cupom indisponível"', async () => {
     comApi(fralda, 150);
-    mockPost.mockRejectedValue(new ApiError(409));
+    mockPost.mockRejectedValue(new ApiError(409, undefined, 'CUPOM_INDISPONIVEL'));
     await fireEvent.press(await abrirConfirmacao());
 
     expect(await screen.findByText('Cupom indisponível. As ofertas deste produto foram atualizadas.')).toBeTruthy();
@@ -363,7 +368,7 @@ describe('resgate', () => {
 
   it('se o produto perdeu as ofertas, a recarga depois do erro mostra que não está mais disponível', async () => {
     comApi(fralda, 150);
-    mockPost.mockRejectedValue(new ApiError(409, 'Cupom indisponível'));
+    mockPost.mockRejectedValue(new ApiError(409, 'Cupom indisponível', 'CUPOM_INDISPONIVEL'));
     const confirmar = await abrirConfirmacao();
     comApi(new ApiError(404, 'Produto não encontrado'));
 
@@ -499,7 +504,7 @@ describe('resgate de promoção', () => {
 
   it('depois de uma resposta definitiva (409), o próximo resgate vai com chave nova', async () => {
     mockPost
-      .mockRejectedValueOnce(new ApiError(409, 'Promoção indisponível'))
+      .mockRejectedValueOnce(new ApiError(409, 'Promoção indisponível', 'PROMOCAO_INDISPONIVEL'))
       .mockResolvedValueOnce(promocaoResgatada);
     await fireEvent.press(await abrirConfirmacaoPromocao());
     await screen.findByText(/Promoção indisponível/);
@@ -514,8 +519,12 @@ describe('resgate de promoção', () => {
     expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
   });
 
-  it('409 "Promoção já resgatada" avisa a gestante e marca o cartão como resgatado', async () => {
-    mockPost.mockRejectedValue(new ApiError(409, 'Promoção já resgatada'));
+  it.each([
+    'Promoção já resgatada',
+    // Outro texto com o mesmo código: a decisão não depende da mensagem
+    'Você já usou esta oferta',
+  ])('409 PROMOCAO_JA_RESGATADA ("%s") avisa a gestante e marca o cartão como resgatado', async (mensagem) => {
+    mockPost.mockRejectedValue(new ApiError(409, mensagem, 'PROMOCAO_JA_RESGATADA'));
     await fireEvent.press(await abrirConfirmacaoPromocao());
 
     expect(
@@ -529,10 +538,10 @@ describe('resgate de promoção', () => {
   });
 
   it.each([
-    [409, 'Promoção indisponível'],
-    [404, 'Promoção não encontrada'],
-  ])('erro %p "%s" mostra a mensagem, recarrega o produto e não oferece tentar de novo', async (status, mensagem) => {
-    mockPost.mockRejectedValue(new ApiError(status, mensagem));
+    [409, 'Promoção indisponível', 'PROMOCAO_INDISPONIVEL'],
+    [404, 'Promoção não encontrada', undefined],
+  ])('erro %p "%s" mostra a mensagem, recarrega o produto e não oferece tentar de novo', async (status, mensagem, codigo) => {
+    mockPost.mockRejectedValue(new ApiError(status, mensagem, codigo));
     await fireEvent.press(await abrirConfirmacaoPromocao());
 
     expect(await screen.findByText(`${mensagem}. As ofertas deste produto foram atualizadas.`)).toBeTruthy();
@@ -544,8 +553,18 @@ describe('resgate de promoção', () => {
     expect(screen.queryByRole('button', { name: 'Já resgatada' })).toBeNull();
   });
 
+  it('409 com o texto "Promoção já resgatada" mas sem o código não marca o cartão: só o código decide', async () => {
+    mockPost.mockRejectedValue(new ApiError(409, 'Promoção já resgatada'));
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    expect(await screen.findByText('Promoção já resgatada. As ofertas deste produto foram atualizadas.')).toBeTruthy();
+    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(4));
+    await fireEvent.press(screen.getByRole('button', { name: 'Fechar' }));
+    expect(screen.queryByRole('button', { name: 'Já resgatada' })).toBeNull();
+  });
+
   it('409 sem mensagem usa "Promoção indisponível"', async () => {
-    mockPost.mockRejectedValue(new ApiError(409));
+    mockPost.mockRejectedValue(new ApiError(409, undefined, 'PROMOCAO_INDISPONIVEL'));
     await fireEvent.press(await abrirConfirmacaoPromocao());
 
     expect(await screen.findByText('Promoção indisponível. As ofertas deste produto foram atualizadas.')).toBeTruthy();

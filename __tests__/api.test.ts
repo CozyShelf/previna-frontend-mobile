@@ -113,10 +113,43 @@ describe('respostas', () => {
     expect((erro as ApiError).message).toBe('Erro 409 na requisição');
   });
 
-  it('erro sem corpo fica sem mensagem', async () => {
+  it('erro sem corpo fica sem mensagem e sem código', async () => {
     mockFetch.mockResolvedValue(resposta(500));
 
-    await expect(get('/qualquer')).rejects.toMatchObject({ status: 500, mensagem: undefined });
+    await expect(get('/qualquer')).rejects.toMatchObject({ status: 500, mensagem: undefined, codigo: undefined });
+  });
+
+  it('erro carrega o código da API, quando vem', async () => {
+    mockFetch.mockResolvedValue(
+      resposta(409, '{"message":"Promoção já resgatada","codigo":"PROMOCAO_JA_RESGATADA"}'),
+    );
+
+    await expect(post('/promocoes/3/resgatar', {})).rejects.toMatchObject({
+      status: 409,
+      mensagem: 'Promoção já resgatada',
+      codigo: 'PROMOCAO_JA_RESGATADA',
+    });
+  });
+
+  it('erro sem o campo codigo fica com o código indefinido', async () => {
+    mockFetch.mockResolvedValue(resposta(409, '{"message":"Pontos insuficientes"}'));
+
+    const erro = (await post('/cupons/5/resgatar', {}).catch((e: unknown) => e)) as ApiError;
+    expect(erro.mensagem).toBe('Pontos insuficientes');
+    expect(erro.codigo).toBeUndefined();
+  });
+
+  it.each([
+    ['não é JSON', '<html>502 Bad Gateway</html>'],
+    ['é JSON mas não é objeto', '"falhou"'],
+    ['é null', 'null'],
+    ['traz campos de outro tipo', '{"message":42,"codigo":["PROMOCAO_JA_RESGATADA"]}'],
+  ])('erro cujo corpo %s vira ApiError sem mensagem nem código', async (_caso, corpo) => {
+    mockFetch.mockResolvedValue(resposta(502, corpo));
+
+    const erro = await get('/qualquer').catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ApiError);
+    expect(erro).toMatchObject({ status: 502, mensagem: undefined, codigo: undefined });
   });
 
   it('falha de rede é repassada como está', async () => {
