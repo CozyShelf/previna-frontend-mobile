@@ -48,7 +48,9 @@ const fralda: ProdutoOfertaDetalhe = {
     { id: 9, desconto: 10, pontosNecessarios: 100, dataValidade: '2026-12-31' },
     { id: 10, desconto: 25, pontosNecessarios: 300, dataValidade: '2027-01-31' },
   ],
-  promocoes: [{ id: 3, titulo: 'Semana do bebê', desconto: 15, dataInicio: '2026-11-01', dataFim: '2026-11-30' }],
+  promocoes: [
+    { id: 3, titulo: 'Semana do bebê', desconto: 15, dataInicio: '2026-11-01', dataFim: '2026-11-30', resgatada: false },
+  ],
 };
 
 const resgatado = {
@@ -59,6 +61,21 @@ const resgatado = {
   dataValidade: '2026-12-31',
   pontosGastos: 100,
   saldo: 50,
+  tipo: 'CUPOM',
+};
+
+// Resgate de promoção: mesmo formato, sem pontos gastos e com o saldo de antes
+const promocaoResgatada = {
+  id: 2,
+  codigo: 'PROMO777',
+  descricao: '15% de desconto em Fraldas',
+  empresa: 'Farmácia Vida',
+  dataValidade: '2026-11-30',
+  status: 'ATIVO',
+  dataResgate: '2026-11-16T10:00:00',
+  pontosGastos: 0,
+  saldo: 150,
+  tipo: 'PROMOCAO',
 };
 
 // Responde o produto e o saldo, como a API; uma resposta Error vira rejeição
@@ -89,11 +106,21 @@ async function tocarDuasVezes(botao: { props: Record<string, unknown> }) {
 }
 
 const botoesResgatar = () => screen.getAllByRole('button', { name: 'Resgatar' });
+// Os cupons vêm antes da promoção na tela: o último "Resgatar" é o da promoção
+const botaoResgatarPromocao = () => botoesResgatar().at(-1)!;
 
 async function abrirConfirmacao() {
   await render(<ProdutoScreen />);
   await screen.findByText('Semana do bebê');
   await fireEvent.press(botoesResgatar()[0]);
+  return screen.getByRole('button', { name: 'Confirmar resgate' });
+}
+
+async function abrirConfirmacaoPromocao(produto: ProdutoOfertaDetalhe = fralda) {
+  comApi(produto, 150);
+  await render(<ProdutoScreen />);
+  await screen.findByText('Semana do bebê');
+  await fireEvent.press(botaoResgatarPromocao());
   return screen.getByRole('button', { name: 'Confirmar resgate' });
 }
 
@@ -363,5 +390,211 @@ describe('resgate', () => {
 
     expect(await screen.findByText(/Não foi possível resgatar o cupom/)).toBeTruthy();
     expect(screen.queryByText(/foram atualizadas/)).toBeNull();
+  });
+});
+
+describe('resgate de promoção', () => {
+  it('cartão mostra que é grátis e o botão Resgatar', async () => {
+    comApi(fralda);
+    await render(<ProdutoScreen />);
+    await screen.findByText('Semana do bebê');
+
+    expect(screen.getByText('Grátis — não usa seus pontos')).toBeTruthy();
+    expect(botoesResgatar()).toHaveLength(3);
+    expect(botaoResgatarPromocao()).toBeEnabled();
+  });
+
+  it('promoção já resgatada fica com o botão "Já resgatada" desabilitado', async () => {
+    comApi({ ...fralda, promocoes: [{ ...fralda.promocoes[0], resgatada: true }] });
+    await render(<ProdutoScreen />);
+
+    expect(await screen.findByRole('button', { name: 'Já resgatada' })).toBeDisabled();
+    // Só os dois cupons continuam resgatáveis
+    expect(botoesResgatar()).toHaveLength(2);
+  });
+
+  it('confirmação diz que é grátis e que o saldo continua; cancelar não resgata', async () => {
+    await abrirConfirmacaoPromocao();
+
+    expect(screen.getByText('Resgatar promoção?')).toBeTruthy();
+    expect(screen.getByText(/Semana do bebê: 15% de desconto na Farmácia Vida. Válida até 30\/11\/2026/)).toBeTruthy();
+    expect(screen.getByText('Grátis')).toBeTruthy();
+    expect(screen.getByText('Seu saldo continua')).toBeTruthy();
+    expect(screen.getByText('Você só pode resgatar esta promoção uma vez.')).toBeTruthy();
+    expect(screen.queryByText(/Custo do cupom/)).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByText('Resgatar promoção?')).toBeNull();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('resgate válido mostra o código, não fala em pontos e marca a promoção como resgatada', async () => {
+    mockPost.mockResolvedValue(promocaoResgatada);
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    expect(await screen.findByText('PROMO777')).toBeTruthy();
+    expect(mockPost).toHaveBeenCalledWith('/promocoes/3/resgatar', {}, {
+      'Idempotency-Key': expect.stringMatching(UUID_V4),
+    });
+    expect(screen.getByText('Promoção resgatada!')).toBeTruthy();
+    expect(screen.getByText('Código da promoção')).toBeTruthy();
+    expect(screen.getByText('Grátis: seus pontos continuam os mesmos.')).toBeTruthy();
+    expect(screen.queryByText('Pontos usados')).toBeNull();
+    expect(screen.queryByText('Novo saldo')).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Concluir' }));
+    expect(screen.queryByText('PROMO777')).toBeNull();
+    // Sem débito: o saldo continua o mesmo e os cupons que ele pagava continuam resgatáveis
+    expect(screen.getByLabelText('Seu saldo: 150 pontos')).toBeTruthy();
+    expect(botoesResgatar()[0]).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Já resgatada' })).toBeDisabled();
+  });
+
+  it('o saldo da tela não muda mesmo se a resposta trouxer outro', async () => {
+    mockPost.mockResolvedValue({ ...promocaoResgatada, saldo: 0 });
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+    await fireEvent.press(await screen.findByRole('button', { name: 'Concluir' }));
+
+    expect(screen.getByLabelText('Seu saldo: 150 pontos')).toBeTruthy();
+  });
+
+  it('dois toques rápidos em confirmar mandam um resgate só', async () => {
+    let responder: (valor: unknown) => void = () => {};
+    mockPost.mockReturnValue(new Promise((resolve) => (responder = resolve)));
+    const confirmar = await abrirConfirmacaoPromocao();
+
+    await tocarDuasVezes(confirmar);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+
+    await act(async () => responder(promocaoResgatada));
+    expect(await screen.findByText('PROMO777')).toBeTruthy();
+  });
+
+  it('tentar de novo depois da falha de rede repete a mesma chave; resposta sem "tipo" também vale', async () => {
+    const { tipo, ...semTipo } = promocaoResgatada;
+    expect(tipo).toBe('PROMOCAO');
+    mockPost.mockRejectedValueOnce(new TypeError('Network request failed')).mockResolvedValueOnce(semTipo);
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    expect(await screen.findByText(/Não foi possível resgatar a promoção. Verifique sua conexão/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('PROMO777')).toBeTruthy();
+    expect(screen.getByText('Promoção resgatada!')).toBeTruthy();
+    expect(mockPost).toHaveBeenCalledTimes(2);
+    expect(chaveDoEnvio(1)).toBe(chaveDoEnvio(0));
+  });
+
+  it('fechar depois de um 503 e reabrir a promoção repete a chave pendente', async () => {
+    mockPost.mockRejectedValueOnce(new ApiError(503)).mockResolvedValueOnce(promocaoResgatada);
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+    await fireEvent.press(await screen.findByRole('button', { name: 'Fechar' }));
+
+    await fireEvent.press(botaoResgatarPromocao());
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+
+    expect(await screen.findByText('PROMO777')).toBeTruthy();
+    expect(chaveDoEnvio(1)).toBe(chaveDoEnvio(0));
+  });
+
+  it('depois de uma resposta definitiva (409), o próximo resgate vai com chave nova', async () => {
+    mockPost
+      .mockRejectedValueOnce(new ApiError(409, 'Promoção indisponível'))
+      .mockResolvedValueOnce(promocaoResgatada);
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+    await screen.findByText(/Promoção indisponível/);
+    await fireEvent.press(screen.getByRole('button', { name: 'Fechar' }));
+
+    await fireEvent.press(botaoResgatarPromocao());
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+
+    expect(await screen.findByText('PROMO777')).toBeTruthy();
+    expect(chaveDoEnvio(0)).toMatch(UUID_V4);
+    expect(chaveDoEnvio(1)).toMatch(UUID_V4);
+    expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
+  });
+
+  it('409 "Promoção já resgatada" avisa a gestante e marca o cartão como resgatado', async () => {
+    mockPost.mockRejectedValue(new ApiError(409, 'Promoção já resgatada'));
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    expect(
+      await screen.findByText('Você já resgatou esta promoção. Cada promoção só pode ser resgatada uma vez.'),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Fechar' }));
+    expect(screen.getByRole('button', { name: 'Já resgatada' })).toBeDisabled();
+    expect(screen.getByLabelText('Seu saldo: 150 pontos')).toBeTruthy();
+  });
+
+  it.each([
+    [409, 'Promoção indisponível'],
+    [404, 'Promoção não encontrada'],
+  ])('erro %p "%s" mostra a mensagem, recarrega o produto e não oferece tentar de novo', async (status, mensagem) => {
+    mockPost.mockRejectedValue(new ApiError(status, mensagem));
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    expect(await screen.findByText(`${mensagem}. As ofertas deste produto foram atualizadas.`)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirmar resgate' })).toBeNull();
+    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(4));
+    // Indisponível não é "já resgatada": o cartão continua como estava
+    await fireEvent.press(screen.getByRole('button', { name: 'Fechar' }));
+    expect(screen.queryByRole('button', { name: 'Já resgatada' })).toBeNull();
+  });
+
+  it('409 sem mensagem usa "Promoção indisponível"', async () => {
+    mockPost.mockRejectedValue(new ApiError(409));
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    expect(await screen.findByText('Promoção indisponível. As ofertas deste produto foram atualizadas.')).toBeTruthy();
+  });
+
+  it('erro 500 oferece tentar de novo e não recarrega', async () => {
+    mockPost.mockRejectedValue(new ApiError(500));
+    await fireEvent.press(await abrirConfirmacaoPromocao());
+
+    expect(await screen.findByText(/Não foi possível resgatar a promoção/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeEnabled();
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('cupom e promoção com o mesmo id têm chaves pendentes separadas', async () => {
+    // Cupom 3 e promoção 3: ids de tabelas diferentes
+    const mesmoId: ProdutoOfertaDetalhe = {
+      ...fralda,
+      cupons: [{ id: 3, desconto: 10, pontosNecessarios: 100, dataValidade: '2026-12-31' }],
+    };
+    mockPost
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockResolvedValueOnce(promocaoResgatada)
+      .mockResolvedValueOnce(resgatado);
+    comApi(mesmoId, 150);
+    await render(<ProdutoScreen />);
+    await screen.findByText('Semana do bebê');
+
+    // Cupom 3 falha na rede: a chave dele fica pendente
+    await fireEvent.press(botoesResgatar()[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Fechar' }));
+
+    // Promoção 3 não herda a chave do cupom 3
+    await fireEvent.press(botaoResgatarPromocao());
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Concluir' }));
+
+    // E o cupom 3 continua com a chave dele, que o resgate da promoção não apagou
+    await fireEvent.press(botoesResgatar()[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+
+    expect(mockPost.mock.calls.map((chamada) => chamada[0])).toEqual([
+      '/cupons/3/resgatar',
+      '/promocoes/3/resgatar',
+      '/cupons/3/resgatar',
+    ]);
+    expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
+    expect(chaveDoEnvio(2)).toBe(chaveDoEnvio(0));
   });
 });
