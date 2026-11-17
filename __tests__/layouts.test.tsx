@@ -45,9 +45,18 @@ jest.mock('expo-router', () => {
       {options.tabBarIcon({ color: 'cinza', size: 24, focused: false })}
     </View>
   );
+  const Stack = ({ children }: { children?: ReactNode }) => (
+    <View>
+      <Text>Pilha de telas</Text>
+      {children}
+    </View>
+  );
+  Stack.Screen = ({ name, options }: { name: string; options: { animation?: string } }) => (
+    <Text>{`tela ${name}: animação ${options.animation}`}</Text>
+  );
   return {
     Redirect: ({ href }: { href: string }) => <Text>{`Redirecionou para ${href}`}</Text>,
-    Stack: () => <Text>Pilha de telas</Text>,
+    Stack,
     Tabs,
   };
 });
@@ -140,8 +149,12 @@ it('layout do início é uma pilha', async () => {
   expect(screen.getByText('Pilha de telas')).toBeTruthy();
 });
 
-it('layout de cupons é uma pilha', async () => {
+it('layout de cupons é uma pilha em que a Loja e os resgatados trocam sem animação', async () => {
   await render(<CuponsLayout />);
 
   expect(screen.getByText('Pilha de telas')).toBeTruthy();
+  expect(screen.getAllByText(/^tela /).map((t) => t.props.children)).toEqual([
+    'tela index: animação none',
+    'tela resgatados: animação none',
+  ]);
 });
