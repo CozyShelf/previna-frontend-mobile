@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { Selo, type CorSelo } from '@/components/selo';
 import { Cores, Espaco, Fontes, Raio } from '@/constants/theme';
 
 // Mesmos valores do enum StatusAgendamento no backend, com os mesmos rótulos do portal web
@@ -34,17 +35,11 @@ export interface CartaoAgendamentoProps {
 
 // Só leitura: quem confirma a realização é o médico, no portal
 export function CartaoAgendamento({ agendamento }: CartaoAgendamentoProps) {
-  const selo = CORES_SELO[agendamento.status];
-
   return (
     <View style={styles.cartao}>
       <View style={styles.cabecalho}>
         <Text style={styles.tipo}>{agendamento.tipo}</Text>
-        <View style={[styles.selo, { backgroundColor: selo.fundo }]}>
-          <Text style={[styles.seloTexto, { color: selo.texto }]}>
-            {ROTULO_STATUS[agendamento.status]}
-          </Text>
-        </View>
+        <Selo texto={ROTULO_STATUS[agendamento.status]} cor={COR_SELO[agendamento.status]} />
       </View>
       <Text style={styles.data}>{formatarData(agendamento.dataPrevista)}</Text>
       {agendamento.observacao ? (
@@ -81,11 +76,11 @@ export function SecaoAgendamentos({ titulo, agendamentos, total }: SecaoAgendame
   );
 }
 
-// Mesmas cores das pílulas do portal: âmbar espera uma ação do médico, esmeralda concluiu, zinc é neutro
-const CORES_SELO: Record<StatusAgendamento, { fundo: string; texto: string }> = {
-  AGENDADO: { fundo: '#fffbeb', texto: '#92400e' },
-  REALIZADO: { fundo: '#ecfdf5', texto: '#047857' },
-  NAO_COMPARECEU: { fundo: '#f4f4f5', texto: '#52525b' },
+// Âmbar espera uma ação do médico, esmeralda concluiu, zinc é neutro
+const COR_SELO: Record<StatusAgendamento, CorSelo> = {
+  AGENDADO: 'ambar',
+  REALIZADO: 'esmeralda',
+  NAO_COMPARECEU: 'zinco',
 };
 
 const styles = StyleSheet.create({
@@ -115,15 +110,6 @@ const styles = StyleSheet.create({
     fontFamily: Fontes.seminegrito,
     fontSize: 16,
     color: Cores.texto,
-  },
-  selo: {
-    borderRadius: 999,
-    paddingHorizontal: Espaco.dois,
-    paddingVertical: 2,
-  },
-  seloTexto: {
-    fontFamily: Fontes.media,
-    fontSize: 12,
   },
   data: {
     fontFamily: Fontes.regular,

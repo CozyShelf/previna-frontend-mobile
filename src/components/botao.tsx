@@ -6,15 +6,18 @@ export interface BotaoProps {
   rotulo: string;
   estilo: 'primario' | 'secundario';
   desabilitado?: boolean;
+  // Nome lido pelo leitor de tela quando o rótulo sozinho não diz a quê se refere (ex.: "Ver código" numa lista)
+  rotuloAcessivel?: string;
   onPress: () => void;
 }
 
-export function Botao({ rotulo, estilo, desabilitado, onPress }: BotaoProps) {
+export function Botao({ rotulo, estilo, desabilitado, rotuloAcessivel, onPress }: BotaoProps) {
   const primario = estilo === 'primario';
 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={rotuloAcessivel}
       accessibilityState={{ disabled: desabilitado }}
       disabled={desabilitado}
       onPress={onPress}
