@@ -21,7 +21,7 @@ os pontos por cupons de desconto das empresas parceiras.
 | `/tutorial`            | Apresentação do app no primeiro uso                                    |
 | `/inicio`              | Próximos exames e consultas e os já realizados                         |
 | `/pontos`              | Saldo e atividades que geraram pontos; `/pontos/extrato` com filtros   |
-| `/cupons`              | Ofertas das empresas parceiras, com filtros; abre `empresa/[id]` ("Ver todos") e `produto/[id]` (cupons, promoção e resgate) |
+| `/cupons`              | Ofertas das empresas parceiras, com filtros; abre `empresa/[id]` ("Ver todos") e `produto/[id]` (resgate de cupom com pontos e de promoção grátis, uma vez só) |
 | `/perfil`              | Contato, foto e saída da conta                                         |
 
 As quatro últimas são as abas (`src/app/(abas)/`) e exigem sessão; sem token, o app volta para o login.
