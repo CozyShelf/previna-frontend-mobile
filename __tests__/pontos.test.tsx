@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import ExtratoScreen from '@/app/(abas)/pontos/extrato';
@@ -76,6 +76,35 @@ describe('pontuação', () => {
     expect(await screen.findByText(/Não foi possível carregar seus pontos/)).toBeTruthy();
     expect(screen.queryByText('Saldo')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ver extrato' })).toBeNull();
+  });
+
+  it('puxar para recarregar busca a pontuação de novo', async () => {
+    mockGet.mockResolvedValueOnce({ saldo: 150, atividades: [] }).mockResolvedValueOnce({ saldo: 200, atividades: [] });
+    await render(<PontuacaoScreen />);
+    await screen.findByLabelText('Saldo: 150 pontos');
+
+    await userEvent.setup().pullToRefresh(screen.getByTestId('tela'));
+
+    expect(await screen.findByLabelText('Saldo: 200 pontos')).toBeTruthy();
+    expect(mockGet).toHaveBeenCalledTimes(2);
+    expect(mockGet).toHaveBeenLastCalledWith('/gestantes/pontuacao');
+  });
+
+  it('o indicador de recarga some quando a resposta chega, mesmo com erro', async () => {
+    let falhar: (e: Error) => void = () => {};
+    mockGet
+      .mockResolvedValueOnce({ saldo: 150, atividades: [] })
+      .mockReturnValueOnce(new Promise((_, reject) => (falhar = reject)));
+    await render(<PontuacaoScreen />);
+    await screen.findByLabelText('Saldo: 150 pontos');
+    const tela = screen.getByTestId('tela');
+
+    await act(async () => tela.props.refreshControl.props.onRefresh());
+    expect(screen.getByTestId('tela').props.refreshControl.props.refreshing).toBe(true);
+
+    await act(async () => falhar(new Error('sem rede')));
+    expect(screen.getByTestId('tela').props.refreshControl.props.refreshing).toBe(false);
+    expect(screen.getByText(/Não foi possível carregar seus pontos/)).toBeTruthy();
   });
 
   it('ver extrato abre a tela do extrato', async () => {
