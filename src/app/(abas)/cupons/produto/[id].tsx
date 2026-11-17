@@ -12,15 +12,27 @@ import {
   OfertaAusente,
   Saldo,
 } from '@/components/cupom';
-import { DialogoResgate, type CupomParaResgate, type CupomResgatado } from '@/components/dialogo-resgate';
+import { DialogoResgate, type CupomResgatado, type OfertaParaResgate } from '@/components/dialogo-resgate';
 import { Tela } from '@/components/tela';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
 import { ApiError, get, post } from '@/lib/api';
 import { gerarChaveIdempotencia } from '@/lib/idempotencia';
-import { buscarSaldo, ROTULO_CATEGORIA, type CupomOferta, type ProdutoOfertaDetalhe } from '@/lib/ofertas';
+import {
+  buscarSaldo,
+  ROTULO_CATEGORIA,
+  type CupomOferta,
+  type ProdutoOfertaDetalhe,
+  type PromocaoOferta,
+  type TipoOferta,
+} from '@/lib/ofertas';
 
 // Inexistente, sem oferta ou id inválido têm a mesma resposta: a gestante não precisa saber qual é
 const INDISPONIVEL = 'Este produto não tem mais ofertas disponíveis.';
+
+// Mensagem do 409 quando a gestante já resgatou a promoção (cada promoção vale uma vez só)
+const PROMOCAO_JA_RESGATADA = 'Promoção já resgatada';
+
+const ROTA_RESGATE: Record<TipoOferta, string> = { CUPOM: '/cupons', PROMOCAO: '/promocoes' };
 
 export default function ProdutoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,7 +43,7 @@ export default function ProdutoScreen() {
   const [erroDaBusca, setErroDaBusca] = useState<string>();
   const erro = idValido ? erroDaBusca : INDISPONIVEL;
 
-  const [selecionado, setSelecionado] = useState<CupomParaResgate>();
+  const [selecionado, setSelecionado] = useState<OfertaParaResgate>();
   const [resgatado, setResgatado] = useState<CupomResgatado>();
   const [erroResgate, setErroResgate] = useState<string>();
   // Falha sem resposta conclusiva (rede, 5xx): o resgate pode ter sido feito ou não, então dá para tentar de novo
@@ -40,11 +52,12 @@ export default function ProdutoScreen() {
   // O estado só desabilita o botão no próximo render: dois toques rápidos mandariam dois resgates e gastariam
   // os pontos em dobro. A ref barra o segundo toque na hora.
   const emEnvio = useRef(false);
-  // Idempotency-Key pendente de cada cupom (id → chave): todas as tentativas de um resgate vão com a mesma, para o
-  // servidor não debitar duas vezes se a primeira chegou e só a resposta se perdeu. Fechar o diálogo depois de uma
-  // falha de rede não descarta a chave: reabrir o mesmo cupom repete o mesmo resgate. Só a resposta definitiva do
-  // servidor (2xx ou 4xx) encerra o resgate; o próximo daquele cupom ganha chave nova.
-  const chavesPendentes = useRef(new Map<number, string>());
+  // Idempotency-Key pendente de cada oferta (id → chave): todas as tentativas de um resgate vão com a mesma, para o
+  // servidor não resgatar duas vezes se a primeira chegou e só a resposta se perdeu. Fechar o diálogo depois de uma
+  // falha de rede não descarta a chave: reabrir a mesma oferta repete o mesmo resgate. Só a resposta definitiva do
+  // servidor (2xx ou 4xx) encerra o resgate; o próximo daquela oferta ganha chave nova. Cupons e promoções têm
+  // mapas separados, porque os ids são de tabelas diferentes: o cupom 5 e a promoção 5 não podem dividir a chave.
+  const chavesPendentes = useRef<Record<TipoOferta, Map<number, string>>>({ CUPOM: new Map(), PROMOCAO: new Map() });
 
   const carregar = useCallback(() => {
     if (!idValido) {
@@ -70,10 +83,26 @@ export default function ProdutoScreen() {
   // Recarrega ao voltar para esta tela: o saldo pode ter mudado e a empresa pode ter mudado as ofertas
   useFocusEffect(carregar);
 
-  function escolher(cupom: CupomOferta) {
+  function escolherCupom(cupom: CupomOferta) {
     if (produto) {
-      setSelecionado({ ...cupom, produto: produto.nome, empresa: produto.empresa.nome });
+      setSelecionado({ ...cupom, tipo: 'CUPOM', produto: produto.nome, empresa: produto.empresa.nome });
     }
+  }
+
+  function escolherPromocao(promocao: PromocaoOferta) {
+    if (produto) {
+      setSelecionado({ ...promocao, tipo: 'PROMOCAO', produto: produto.nome, empresa: produto.empresa.nome });
+    }
+  }
+
+  // Marca a promoção como resgatada sem esperar a recarga: o botão do cartão vira "Já resgatada" na hora
+  function marcarPromocaoResgatada(promocaoId: number) {
+    setProduto((atual) =>
+      atual && {
+        ...atual,
+        promocoes: atual.promocoes.map((p) => (p.id === promocaoId ? { ...p, resgatada: true } : p)),
+      },
+    );
   }
 
   async function resgatar() {
@@ -84,28 +113,44 @@ export default function ProdutoScreen() {
     setEnviando(true);
     setErroResgate(undefined);
     setPodeTentarDeNovo(false);
-    const cupomId = selecionado.id;
-    const chave = chavesPendentes.current.get(cupomId) ?? gerarChaveIdempotencia();
-    chavesPendentes.current.set(cupomId, chave);
+    const { tipo, id: ofertaId } = selecionado;
+    const promocao = tipo === 'PROMOCAO';
+    const chaves = chavesPendentes.current[tipo];
+    const chave = chaves.get(ofertaId) ?? gerarChaveIdempotencia();
+    chaves.set(ofertaId, chave);
     try {
       // 201 no primeiro resgate e 200 quando o servidor reconhece a chave e devolve o já feito: os dois são sucesso
-      const resposta = await post<CupomResgatado>(`/cupons/${cupomId}/resgatar`, {}, { 'Idempotency-Key': chave });
-      chavesPendentes.current.delete(cupomId);
+      const resposta = await post<CupomResgatado>(`${ROTA_RESGATE[tipo]}/${ofertaId}/resgatar`, {}, {
+        'Idempotency-Key': chave,
+      });
+      chaves.delete(ofertaId);
       setResgatado(resposta);
-      setSaldo(resposta.saldo);
+      if (promocao) {
+        // A promoção não gasta pontos: o saldo fica como está
+        marcarPromocaoResgatada(ofertaId);
+      } else {
+        setSaldo(resposta.saldo);
+      }
     } catch (e) {
       const definitiva = e instanceof ApiError && e.status >= 400 && e.status < 500;
       if (definitiva) {
-        chavesPendentes.current.delete(cupomId);
+        chaves.delete(ofertaId);
       }
-      // 404 "Cupom não encontrado", 409 "Cupom indisponível" ou "Pontos insuficientes", com a mensagem da API:
-      // as ofertas ou o saldo na tela estavam desatualizados, então recarrega
-      if (e instanceof ApiError && (e.status === 404 || e.status === 409)) {
-        setErroResgate(`${e.mensagem ?? 'Cupom indisponível'}. As ofertas deste produto foram atualizadas.`);
+      if (promocao && e instanceof ApiError && e.status === 409 && e.mensagem === PROMOCAO_JA_RESGATADA) {
+        // Resgatou antes (em outro aparelho, ou a tela estava desatualizada): o cartão passa a dizer isso
+        marcarPromocaoResgatada(ofertaId);
+        setErroResgate('Você já resgatou esta promoção. Cada promoção só pode ser resgatada uma vez.');
+      } else if (e instanceof ApiError && (e.status === 404 || e.status === 409)) {
+        // 404 "Cupom/Promoção não encontrada", 409 "Cupom/Promoção indisponível" ou "Pontos insuficientes", com a
+        // mensagem da API: as ofertas ou o saldo na tela estavam desatualizados, então recarrega
+        const padrao = promocao ? 'Promoção indisponível' : 'Cupom indisponível';
+        setErroResgate(`${e.mensagem ?? padrao}. As ofertas deste produto foram atualizadas.`);
         carregar();
       } else {
         // Rede ou 5xx: a chave continua pendente e a nova tentativa, se o primeiro envio chegou, recebe o mesmo resgate
-        setErroResgate('Não foi possível resgatar o cupom. Verifique sua conexão e tente de novo.');
+        setErroResgate(
+          `Não foi possível resgatar ${promocao ? 'a promoção' : 'o cupom'}. Verifique sua conexão e tente de novo.`,
+        );
         setPodeTentarDeNovo(!definitiva);
       }
     } finally {
@@ -153,7 +198,7 @@ export default function ProdutoScreen() {
               </Text>
               {produto.cupons.length === 0 ? <OfertaAusente texto="Sem cupom no momento" /> : null}
               {produto.cupons.map((cupom) => (
-                <CartaoCupom key={cupom.id} cupom={cupom} saldo={saldo} onResgatar={escolher} />
+                <CartaoCupom key={cupom.id} cupom={cupom} saldo={saldo} onResgatar={escolherCupom} />
               ))}
             </View>
 
@@ -163,7 +208,7 @@ export default function ProdutoScreen() {
               </Text>
               {produto.promocoes.length === 0 ? <OfertaAusente texto="Sem promoção para este produto" /> : null}
               {produto.promocoes.map((promocao) => (
-                <CartaoPromocao key={promocao.id} promocao={promocao} />
+                <CartaoPromocao key={promocao.id} promocao={promocao} onResgatar={escolherPromocao} />
               ))}
             </View>
           </>
@@ -173,7 +218,7 @@ export default function ProdutoScreen() {
       </View>
 
       <DialogoResgate
-        cupom={selecionado}
+        oferta={selecionado}
         saldo={saldo}
         resgatado={resgatado}
         erro={erroResgate}

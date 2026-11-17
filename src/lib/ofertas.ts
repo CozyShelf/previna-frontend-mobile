@@ -52,6 +52,9 @@ export interface PromocaoOferta {
   desconto: number;
   dataInicio: string;
   dataFim: string;
+  // A gestante resgata cada promoção uma vez só. Opcional enquanto houver backend sem o campo: ausente vale como não
+  // resgatada, e o servidor responde 409 se ela já tiver resgatado.
+  resgatada?: boolean;
 }
 
 // Detalhe do produto: cupons do mais barato para o mais caro, promoções do maior desconto para o menor
