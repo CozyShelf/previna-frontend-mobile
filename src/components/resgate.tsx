@@ -15,8 +15,8 @@ export const COR_STATUS_RESGATE: Record<StatusResgate, CorSelo> = {
 
 // A data que interessa em cada status: até quando vale, quando foi usado ou quando venceu
 export function dataDoResgate(resgate: Resgate) {
-  if (resgate.status === 'UTILIZADO' && resgate.dataUso) {
-    return `Usado em ${formatarDia(resgate.dataUso)}`;
+  if (resgate.status === 'UTILIZADO') {
+    return resgate.dataUso ? `Usado em ${formatarDia(resgate.dataUso)}` : 'Já usado na loja';
   }
   const validade = formatarData(resgate.dataValidade);
   return resgate.status === 'EXPIRADO' ? `Venceu em ${validade}` : `Válido até ${validade}`;
