@@ -73,6 +73,16 @@ async function abrir(dados: object = perfil) {
   await screen.findByRole('header', { name: 'Maria Silva' });
 }
 
+// Dois toques no mesmo instante, sem render entre eles: o botão ainda está habilitado no segundo. O onClick do
+// Pressable (o clique de acessibilidade) chama o onPress direto, então os dois cabem num act só.
+async function tocarDuasVezes(botao: { props: Record<string, unknown> }) {
+  const clicar = botao.props.onClick as (evento: object) => void;
+  await act(async () => {
+    clicar({});
+    clicar({});
+  });
+}
+
 async function salvar() {
   await fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }));
 }
@@ -154,6 +164,18 @@ describe('validação', () => {
 });
 
 describe('salvar', () => {
+  it('dois toques rápidos em salvar mandam uma requisição só', async () => {
+    let responder: (valor: unknown) => void = () => {};
+    await abrir();
+    mockPut.mockReturnValue(new Promise((resolve) => (responder = resolve)));
+
+    await tocarDuasVezes(screen.getByRole('button', { name: 'Salvar alterações' }));
+    expect(mockPut).toHaveBeenCalledTimes(1);
+
+    await act(async () => responder(perfil));
+    expect(screen.getByText('Alterações salvas.')).toBeTruthy();
+  });
+
   it('manda telefone só com dígitos e e-mail sem espaços, sem mexer na foto', async () => {
     await abrir();
     await fireEvent.changeText(screen.getByLabelText('E-mail'), '  nova@exemplo.com ');

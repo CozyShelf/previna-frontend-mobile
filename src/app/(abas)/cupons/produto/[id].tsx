@@ -16,6 +16,7 @@ import { DialogoResgate, type CupomParaResgate, type CupomResgatado } from '@/co
 import { Tela } from '@/components/tela';
 import { Cores, Espaco, Fontes } from '@/constants/theme';
 import { ApiError, get, post } from '@/lib/api';
+import { gerarChaveIdempotencia } from '@/lib/idempotencia';
 import { buscarSaldo, ROTULO_CATEGORIA, type CupomOferta, type ProdutoOfertaDetalhe } from '@/lib/ofertas';
 
 // Inexistente, sem oferta ou id inválido têm a mesma resposta: a gestante não precisa saber qual é
@@ -33,10 +34,17 @@ export default function ProdutoScreen() {
   const [selecionado, setSelecionado] = useState<CupomParaResgate>();
   const [resgatado, setResgatado] = useState<CupomResgatado>();
   const [erroResgate, setErroResgate] = useState<string>();
+  // Falha sem resposta conclusiva (rede, 5xx): o resgate pode ter sido feito ou não, então dá para tentar de novo
+  const [podeTentarDeNovo, setPodeTentarDeNovo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   // O estado só desabilita o botão no próximo render: dois toques rápidos mandariam dois resgates e gastariam
   // os pontos em dobro. A ref barra o segundo toque na hora.
   const emEnvio = useRef(false);
+  // Idempotency-Key pendente de cada cupom (id → chave): todas as tentativas de um resgate vão com a mesma, para o
+  // servidor não debitar duas vezes se a primeira chegou e só a resposta se perdeu. Fechar o diálogo depois de uma
+  // falha de rede não descarta a chave: reabrir o mesmo cupom repete o mesmo resgate. Só a resposta definitiva do
+  // servidor (2xx ou 4xx) encerra o resgate; o próximo daquele cupom ganha chave nova.
+  const chavesPendentes = useRef(new Map<number, string>());
 
   const carregar = useCallback(() => {
     if (!idValido) {
@@ -75,18 +83,30 @@ export default function ProdutoScreen() {
     emEnvio.current = true;
     setEnviando(true);
     setErroResgate(undefined);
+    setPodeTentarDeNovo(false);
+    const cupomId = selecionado.id;
+    const chave = chavesPendentes.current.get(cupomId) ?? gerarChaveIdempotencia();
+    chavesPendentes.current.set(cupomId, chave);
     try {
-      const resposta = await post<CupomResgatado>(`/cupons/${selecionado.id}/resgatar`, {});
+      // 201 no primeiro resgate e 200 quando o servidor reconhece a chave e devolve o já feito: os dois são sucesso
+      const resposta = await post<CupomResgatado>(`/cupons/${cupomId}/resgatar`, {}, { 'Idempotency-Key': chave });
+      chavesPendentes.current.delete(cupomId);
       setResgatado(resposta);
       setSaldo(resposta.saldo);
     } catch (e) {
+      const definitiva = e instanceof ApiError && e.status >= 400 && e.status < 500;
+      if (definitiva) {
+        chavesPendentes.current.delete(cupomId);
+      }
       // 404 "Cupom não encontrado", 409 "Cupom indisponível" ou "Pontos insuficientes", com a mensagem da API:
       // as ofertas ou o saldo na tela estavam desatualizados, então recarrega
       if (e instanceof ApiError && (e.status === 404 || e.status === 409)) {
         setErroResgate(`${e.mensagem ?? 'Cupom indisponível'}. As ofertas deste produto foram atualizadas.`);
         carregar();
       } else {
+        // Rede ou 5xx: a chave continua pendente e a nova tentativa, se o primeiro envio chegou, recebe o mesmo resgate
         setErroResgate('Não foi possível resgatar o cupom. Verifique sua conexão e tente de novo.');
+        setPodeTentarDeNovo(!definitiva);
       }
     } finally {
       emEnvio.current = false;
@@ -95,6 +115,7 @@ export default function ProdutoScreen() {
   }
 
   function fechar() {
+    setPodeTentarDeNovo(false);
     setSelecionado(undefined);
     setResgatado(undefined);
     setErroResgate(undefined);
@@ -156,6 +177,7 @@ export default function ProdutoScreen() {
         saldo={saldo}
         resgatado={resgatado}
         erro={erroResgate}
+        podeTentarDeNovo={podeTentarDeNovo}
         enviando={enviando}
         onConfirmar={() => void resgatar()}
         onFechar={fechar}

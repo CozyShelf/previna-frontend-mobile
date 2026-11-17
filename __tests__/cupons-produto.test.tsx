@@ -71,6 +71,23 @@ function comApi(produto: ProdutoOfertaDetalhe | Error, saldo = 150) {
   });
 }
 
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+// Idempotency-Key mandada na n-ésima chamada de resgate
+function chaveDoEnvio(n: number): string {
+  return mockPost.mock.calls[n][2]['Idempotency-Key'];
+}
+
+// Dois toques no mesmo instante, sem render entre eles: o botão ainda está habilitado no segundo. O onClick do
+// Pressable (o clique de acessibilidade) chama o onPress direto, então os dois cabem num act só.
+async function tocarDuasVezes(botao: { props: Record<string, unknown> }) {
+  const clicar = botao.props.onClick as (evento: object) => void;
+  await act(async () => {
+    clicar({});
+    clicar({});
+  });
+}
+
 const botoesResgatar = () => screen.getAllByRole('button', { name: 'Resgatar' });
 
 async function abrirConfirmacao() {
@@ -185,7 +202,9 @@ describe('resgate', () => {
     await fireEvent.press(await abrirConfirmacao());
 
     expect(await screen.findByText('ABCD2345')).toBeTruthy();
-    expect(mockPost).toHaveBeenCalledWith('/cupons/9/resgatar', {});
+    expect(mockPost).toHaveBeenCalledWith('/cupons/9/resgatar', {}, {
+      'Idempotency-Key': expect.stringMatching(UUID_V4),
+    });
     expect(screen.getByText('Novo saldo')).toBeTruthy();
 
     await fireEvent.press(screen.getByRole('button', { name: 'Concluir' }));
@@ -202,12 +221,82 @@ describe('resgate', () => {
     mockPost.mockReturnValue(new Promise((resolve) => (responder = resolve)));
     const confirmar = await abrirConfirmacao();
 
-    await fireEvent.press(confirmar);
-    await fireEvent.press(confirmar);
+    await tocarDuasVezes(confirmar);
     expect(mockPost).toHaveBeenCalledTimes(1);
 
     await act(async () => responder(resgatado));
     expect(await screen.findByText('ABCD2345')).toBeTruthy();
+  });
+
+  it('depois de um resgate concluído, o próximo do mesmo cupom vai com chave nova', async () => {
+    comApi(fralda, 1000);
+    mockPost.mockResolvedValue({ ...resgatado, saldo: 900 });
+    await fireEvent.press(await abrirConfirmacao());
+    await fireEvent.press(await screen.findByRole('button', { name: 'Concluir' }));
+
+    await fireEvent.press(botoesResgatar()[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+    await screen.findByText('ABCD2345');
+
+    expect(mockPost).toHaveBeenCalledTimes(2);
+    expect(chaveDoEnvio(0)).toMatch(UUID_V4);
+    expect(chaveDoEnvio(1)).toMatch(UUID_V4);
+    expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
+  });
+
+  it('tentar de novo depois da falha de rede repete a mesma chave, e a resposta (200) conclui o resgate', async () => {
+    comApi(fralda, 150);
+    mockPost.mockRejectedValueOnce(new TypeError('Network request failed')).mockResolvedValueOnce(resgatado);
+    await fireEvent.press(await abrirConfirmacao());
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+    expect(mockPost).toHaveBeenCalledTimes(2);
+    expect(chaveDoEnvio(1)).toBe(chaveDoEnvio(0));
+  });
+
+  it('fechar depois da falha de rede e reabrir o mesmo cupom repete a chave pendente', async () => {
+    comApi(fralda, 150);
+    mockPost.mockRejectedValueOnce(new TypeError('Network request failed')).mockResolvedValueOnce(resgatado);
+    await fireEvent.press(await abrirConfirmacao());
+    await fireEvent.press(await screen.findByRole('button', { name: 'Fechar' }));
+
+    await fireEvent.press(botoesResgatar()[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+
+    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+    expect(chaveDoEnvio(1)).toBe(chaveDoEnvio(0));
+  });
+
+  it('com a chave de um cupom pendente, outro cupom vai com chave própria', async () => {
+    comApi(fralda, 1000);
+    mockPost.mockRejectedValueOnce(new ApiError(503)).mockResolvedValueOnce(resgatado);
+    await fireEvent.press(await abrirConfirmacao());
+    await fireEvent.press(await screen.findByRole('button', { name: 'Fechar' }));
+
+    await fireEvent.press(botoesResgatar()[1]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+
+    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+    expect(mockPost.mock.calls[1][0]).toBe('/cupons/10/resgatar');
+    expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
+  });
+
+  it.each([409, 400])('erro %p encerra o resgate: reabrir o mesmo cupom vai com chave nova', async (status) => {
+    comApi(fralda, 150);
+    mockPost.mockRejectedValueOnce(new ApiError(status)).mockResolvedValueOnce(resgatado);
+    await fireEvent.press(await abrirConfirmacao());
+    // 4xx é resposta definitiva: não oferece tentar de novo
+    await screen.findByText(/Cupom indisponível|Não foi possível resgatar/);
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Fechar' }));
+
+    await fireEvent.press((await screen.findAllByRole('button', { name: 'Resgatar' }))[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Confirmar resgate' }));
+
+    expect(await screen.findByText('ABCD2345')).toBeTruthy();
+    expect(chaveDoEnvio(1)).not.toBe(chaveDoEnvio(0));
   });
 
   it('durante o envio o botão fica desabilitado e não dá para cancelar', async () => {

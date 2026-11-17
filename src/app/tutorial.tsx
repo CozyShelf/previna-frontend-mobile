@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Redirect, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   interpolate,
@@ -60,6 +60,8 @@ export default function TutorialScreen() {
   const [indice, setIndice] = useState(0);
   const [erro, setErro] = useState<string>();
   const [enviando, setEnviando] = useState(false);
+  // O estado só desabilita o botão no próximo render: a ref barra na hora um segundo toque rápido
+  const emEnvio = useRef(false);
 
   useAnimatedReaction(
     () => Math.round(progresso.value),
@@ -84,6 +86,10 @@ export default function TutorialScreen() {
   }
 
   async function concluir() {
+    if (emEnvio.current) {
+      return;
+    }
+    emEnvio.current = true;
     setErro(undefined);
     setEnviando(true);
     try {
@@ -92,6 +98,7 @@ export default function TutorialScreen() {
     } catch {
       setErro('Não foi possível concluir. Verifique sua conexão e tente novamente.');
     } finally {
+      emEnvio.current = false;
       setEnviando(false);
     }
   }
