@@ -29,9 +29,6 @@ import {
 // Inexistente, sem oferta ou id inválido têm a mesma resposta: a gestante não precisa saber qual é
 const INDISPONIVEL = 'Este produto não tem mais ofertas disponíveis.';
 
-// Mensagem do 409 quando a gestante já resgatou a promoção (cada promoção vale uma vez só)
-const PROMOCAO_JA_RESGATADA = 'Promoção já resgatada';
-
 const ROTA_RESGATE: Record<TipoOferta, string> = { CUPOM: '/cupons', PROMOCAO: '/promocoes' };
 
 export default function ProdutoScreen() {
@@ -136,13 +133,15 @@ export default function ProdutoScreen() {
       if (definitiva) {
         chaves.delete(ofertaId);
       }
-      if (promocao && e instanceof ApiError && e.status === 409 && e.mensagem === PROMOCAO_JA_RESGATADA) {
-        // Resgatou antes (em outro aparelho, ou a tela estava desatualizada): o cartão passa a dizer isso
+      if (promocao && e instanceof ApiError && e.codigo === 'PROMOCAO_JA_RESGATADA') {
+        // Resgatou antes (em outro aparelho, ou a tela estava desatualizada): o cartão passa a dizer isso. A decisão
+        // é pelo código, não pelo texto da API, que pode mudar
         marcarPromocaoResgatada(ofertaId);
         setErroResgate('Você já resgatou esta promoção. Cada promoção só pode ser resgatada uma vez.');
       } else if (e instanceof ApiError && (e.status === 404 || e.status === 409)) {
-        // 404 "Cupom/Promoção não encontrada", 409 "Cupom/Promoção indisponível" ou "Pontos insuficientes", com a
-        // mensagem da API: as ofertas ou o saldo na tela estavam desatualizados, então recarrega
+        // 404 "Cupom/Promoção não encontrada" ou 409 com PROMOCAO_INDISPONIVEL, CUPOM_INDISPONIVEL ou
+        // PONTOS_INSUFICIENTES, com a mensagem da API: as ofertas ou o saldo na tela estavam desatualizados, então
+        // recarrega. Um 409 sem código (backend antigo) segue o mesmo caminho
         const padrao = promocao ? 'Promoção indisponível' : 'Cupom indisponível';
         setErroResgate(`${e.mensagem ?? padrao}. As ofertas deste produto foram atualizadas.`);
         carregar();
