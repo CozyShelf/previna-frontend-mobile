@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AbasCupons } from '@/components/abas-cupons';
 import { Alerta } from '@/components/alerta';
 import { Botao } from '@/components/botao';
 import { PainelFiltros } from '@/components/filtros-ofertas';
@@ -63,6 +64,7 @@ export default function ResgatadosScreen() {
       descricao="Os cupons e promoções que você resgatou. Toque em “Ver código” para mostrar no caixa da loja."
       cabecalho={
         <View style={styles.cabecalho}>
+          <AbasCupons ativa="resgatados" />
           <PainelFiltros
             busca={busca}
             onBusca={setBusca}
