@@ -9,11 +9,12 @@ Usuários do seed: `admin` / `admin123` e `medico` / `medico123`.
 
 **Legenda:**
 - ✅ **Maestro (fluxo N):** coberto pelos testes automáticos do app (`.maestro/`, branch `test/e2e-maestro`), que passaram 7/7 no emulador em 20/11.
+- ✅ **Playwright (arquivo):** coberto pelos testes automáticos do portal (`e2e/*.spec.ts` no `previna-frontend`, branch `test/e2e-playwright`), que passaram 23/23 em 20/11. Para rodar: `npm run e2e:docker`.
 - ✅ **Preparação:** feito pela API no `npm run e2e:preparar`. A regra do backend está coberta, mas a tela do portal não foi usada.
 - ✅ **Conferido:** verificado à mão ou por comando, com a data.
 - [ ] **Manual:** ainda falta fazer.
 
-Como rodar os testes automáticos: veja a seção "Testes de ponta a ponta (Maestro)" no README do app.
+Como rodar os testes automáticos: veja a seção "Testes de ponta a ponta (Maestro)" no README do app e "Testes de ponta a ponta (Playwright)" no README do portal.
 
 ## 0. Preparação
 - ✅ **Conferido (20/11):** os quatro repositórios estão na `development` atualizada.
@@ -25,9 +26,9 @@ Como rodar os testes automáticos: veja a seção "Testes de ponta a ponta (Maes
 - ✅ **Preparação:** pré-cadastro de empresa pelo admin, com a senha temporária lida no MailHog.
 - ✅ **Preparação:** primeiro acesso da empresa.
 - ✅ **Preparação:** produto FRALDAS, cupom de poucos pontos e promoção FRALDAS vigente hoje.
-- [ ] **Manual (tela do portal):** fazer o mesmo pelas telas: pré-cadastro, primeiro acesso pelo e-mail, cadastro de produto, cupom e promoção.
-- [ ] **Manual, regra D12:** criar uma segunda promoção de FRALDAS no mesmo período. O portal deve avisar da sobreposição (409 `PROMOCAO_SOBREPOSTA`).
-- [ ] **Manual, regra D10:** num produto sem categoria, deve dar para criar cupom e não deve haver promoção.
+- ✅ **Playwright (`empresa.spec.ts`):** o mesmo pelas telas: o admin faz o pré-cadastro com a senha lida no MailHog, a empresa faz o primeiro acesso e cadastra o produto FRALDAS, o produto sem categoria, o cupom e a promoção.
+- ✅ **Playwright (`empresa.spec.ts`), regra D12:** a segunda promoção de FRALDAS no mesmo período mostra o aviso de sobreposição.
+- ✅ **Playwright (`empresa.spec.ts`), regra D10:** o produto sem categoria aceita cupom, e a promoção exige categoria.
 
 ## 2. Gestante com pontos
 - ✅ **Preparação:** pré-cadastro da gestante pelo médico, exame agendado para hoje e confirmado (crédito de pontos), primeiro acesso e tutorial.
@@ -35,7 +36,7 @@ Como rodar os testes automáticos: veja a seção "Testes de ponta a ponta (Maes
 - ✅ **Maestro (fluxo 01):** login, Início e sessão lembrada ao reabrir o app.
 - ✅ **Maestro (fluxo 02):** a aba Pontos mostra o saldo igual ao da API, e puxar para baixo atualiza depois de um débito.
 - [ ] **Manual:** o extrato de pontos com o crédito e os filtros.
-- [ ] **Manual, agendamento repetido:** agendar duas vezes o mesmo tipo na mesma data para a mesma gestante. O portal deve avisar (409 `AGENDAMENTO_PENDENTE_REPETIDO`).
+- ✅ **Playwright (`medico.spec.ts`), agendamento repetido:** o aviso aparece para um item repetido na mesma lista e contra um agendamento já gravado (409 `AGENDAMENTO_PENDENTE_REPETIDO`).
 
 ## 3. Resgates (app)
 - ✅ **Maestro (fluxo 03):** a busca na Loja acha o produto, e o detalhe mostra os cards do cupom e da promoção.
@@ -52,12 +53,12 @@ Como rodar os testes automáticos: veja a seção "Testes de ponta a ponta (Maes
 
 ## 5. Validação (portal)
 - ✅ **Maestro (fluxo 07):** a empresa valida o código pela API (`POST /empresas/cupons/validar`).
-- [ ] **Manual (tela do portal):** abrir **Validar cupom** pelo menu e pelo link do tutorial (etapa 4).
-- [ ] **Manual:** digitar o código em minúsculas e apertar Enter. Deve aparecer o cartão verde com os dados e "Validado em".
-- [ ] **Manual:** validar o mesmo código de novo. Deve aparecer o cartão vermelho "já foi utilizado em <data e hora>".
-- [ ] **Manual:** validar o código da promoção. Deve aparecer o cartão verde "Promoção validada".
-- [ ] **Manual:** validar um código inventado. Deve aparecer "Código não encontrado".
-- [ ] **Manual, outra empresa:** validar com outra empresa um código da primeira. Deve aparecer "não encontrado", nunca "já utilizado".
+- ✅ **Playwright (`validar-cupom.spec.ts`):** abre **Validar cupom** pelo menu e pelo link do tutorial (etapa 4).
+- ✅ **Playwright (`validar-cupom.spec.ts`):** o código em minúsculas mais Enter mostra o cartão verde com "Validado em".
+- ✅ **Playwright (`validar-cupom.spec.ts`):** o mesmo código de novo mostra "já foi utilizado em <data e hora>".
+- ✅ **Playwright (`validar-cupom.spec.ts`):** o código da promoção mostra "Promoção validada".
+- ✅ **Playwright (`validar-cupom.spec.ts`):** um código inventado mostra "Código não encontrado".
+- ✅ **Playwright (`validar-cupom.spec.ts`), outra empresa:** um código da primeira empresa, usado ou não, mostra "não encontrado", nunca "já utilizado".
 - [ ] **(Opcional) Expirado:** no banco de dev, pôr `data_validade` no passado em um resgate ATIVO e validar. Deve aparecer "expirou", e o status no banco deve virar EXPIRADO.
 - [ ] **(Opcional) Leitor de QR:** ler o QR Code do app com um leitor USB e conferir que ele valida sozinho com o Enter.
 
@@ -70,22 +71,24 @@ Como rodar os testes automáticos: veja a seção "Testes de ponta a ponta (Maes
 - [ ] **Manual:** com um exame agendado e ainda não confirmado, a seção "Pendentes" aparece antes de "Concluídos".
 
 ## 8. Portal: perfis, linhas clicáveis e painel da tela Início
-- [ ] **Manual, bloqueio por perfil:** como admin, digitar `/produtos` na barra de endereço volta para o início. Como empresa, `/medicos` também volta.
-- [ ] **Manual, linha clicável:** na lista de gestantes do médico, clicar em qualquer ponto da linha abre a gestante. Nas listas de produtos e cupons, o botão Ativar/Desativar não abre a linha.
-- [ ] **Manual, saudação:** Bom dia, Boa tarde ou Boa noite conforme a hora do computador.
-- [ ] **Manual, painel do médico:** agenda do dia, atrasados (em vermelho), próximos 7 dias e gestantes sem nada agendado.
-- [ ] **Manual, painel da empresa:** botão "Validar cupom", os 4 números, cupons que vencem em 7 dias, produtos sem oferta e últimas validações. Depois do fluxo 07, a validação feita deve aparecer em "Últimas validações".
-- [ ] **Manual, painel do admin:** os números, as empresas aguardando o primeiro acesso (as empresas "E2E" da preparação aparecem ali se não fizeram o primeiro acesso) e a atividade recente.
+- ✅ **Playwright (`perfis.spec.ts`), bloqueio por perfil:** o admin em `/produtos` e a empresa em `/medicos` voltam para o início.
+- ✅ **Playwright (`medico.spec.ts`), linha clicável:** na lista de gestantes, clicar numa célula que não é o nome abre a gestante.
+- [ ] **Manual:** nas listas de produtos e cupons, o botão Ativar/Desativar não abre a linha. Isso tem teste unitário, mas não foi visto na tela.
+- ✅ **Playwright (`saudacao.spec.ts`), saudação:** às 9h aparece "Bom dia", às 15h "Boa tarde" e à 1h "Boa noite".
+- ✅ **Playwright (`medico.spec.ts`), painel do médico:** gestantes acompanhadas, agenda de hoje, atrasados vazio, próximos 7 dias com o agendamento criado e gestantes sem nada agendado.
+- [ ] **Manual:** ver o card "Atrasados" em vermelho, com um exame de data passada.
+- ✅ **Playwright (`validar-cupom.spec.ts`), painel da empresa:** os 4 números, "Últimas validações" com os códigos e o botão "Validar cupom" levando à tela.
+- ✅ **Playwright (`painel-admin.spec.ts`), painel do admin:** a atividade recente mostra agendado, confirmado, código validado, cupom resgatado e promoção resgatada.
 
 ## 9. Log de auditoria
-- [ ] **Manual:** depois dos testes, a atividade recente do admin mostra as ações (agendado, confirmado, cupom resgatado, promoção resgatada, código validado). Nas ações da gestante, aparece só "Gestante", sem o nome.
+- ✅ **Playwright (`painel-admin.spec.ts`):** nas ações da gestante aparece só "Gestante", e o nome dela não aparece nem na página nem na resposta de `/painel/admin`.
 - [ ] **Manual (opcional, banco):** `SELECT acao, count(*) FROM log_auditoria GROUP BY acao;` deve mostrar as 6 ações. Um `UPDATE` ou `DELETE` na tabela deve falhar.
 
 ## 10. Rota antiga removida
 - ✅ **Conferido (20/11):** `GET http://localhost:8080/backend/cupons/disponiveis` responde 404.
 
-## Próximo passo para reduzir o manual
-As seções 1, 5 e 8 são telas do portal. Elas podem virar testes automáticos com o **Playwright**, do mesmo jeito que o Maestro cobriu o app.
+## O que sobra à mão
+O app (Maestro) e o portal (Playwright) estão cobertos. O que sobra à mão é pouco, e a maior parte é visual: o card "Atrasados" em vermelho, o toque duplo, os filtros que os fluxos não usam, o leitor de QR e o código expirado.
 
 ## Resultado
 Anotar aqui o que falhou, com o passo, o print e o horário, para cruzar com os logs do backend.
