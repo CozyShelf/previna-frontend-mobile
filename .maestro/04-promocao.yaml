@@ -1,0 +1,35 @@
+# Fluxo 4: resgata a promoção do mesmo produto (grátis, sem gastar pontos) e, ao voltar ao produto, ela aparece como
+# "Já resgatada". A promoção só pode ser resgatada uma vez: repetir este fluxo exige um npm run e2e:preparar novo.
+appId: host.exp.exponent
+name: 04 Promoção
+tags:
+  - e2e
+---
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: exigirPromocaoLivre
+- runFlow: subfluxos/login.yaml
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: saldo
+- runFlow: subfluxos/resgatar-promocao.yaml
+# O saldo não mudou
+- assertVisible: "Seu saldo: ${output.saldoTexto}"
+# Sai do produto e volta: o "Já resgatada" vem do servidor, não só da tela
+- scrollUntilVisible:
+    element: "Voltar"
+- tapOn: "Voltar"
+- scrollUntilVisible:
+    element: "${PRODUTO_NOME}, .*"
+    timeout: 15000
+- tapOn: "${PRODUTO_NOME}, .*"
+- extendedWaitUntil:
+    visible: "Vendido por ${EMPRESA_NOME}"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Já resgatada"
+- assertNotVisible:
+    text: "Resgatar"
+    below: ${PROMOCAO_TITULO}

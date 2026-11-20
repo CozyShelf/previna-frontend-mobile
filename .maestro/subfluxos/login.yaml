@@ -1,0 +1,28 @@
+# Abre o app e entra com a gestante da preparação (GESTANTE_LOGIN e GESTANTE_SENHA). Se o aparelho lembrava outra
+# sessão, sai antes, para o fluxo sempre usar a gestante certa. Termina na Início.
+appId: host.exp.exponent
+---
+- runFlow: abrir-app.yaml
+- runFlow:
+    when:
+      visible: "Meus exames e consultas"
+    file: logout.yaml
+- runFlow:
+    file: digitar.yaml
+    env:
+      CAMPO: "Login"
+      TEXTO: ${GESTANTE_LOGIN}
+- runFlow:
+    file: digitar.yaml
+    env:
+      CAMPO: "Senha"
+      TEXTO: ${GESTANTE_SENHA}
+- tapOn: "Entrar"
+# Espera a Início ou a oferta do Android de salvar a senha, que aparece por cima dela
+- extendedWaitUntil:
+    visible: "Meus exames e consultas|Not now|Never|Agora não|Nunca"
+    timeout: 20000
+- runFlow: recusar-salvar-senha.yaml
+- extendedWaitUntil:
+    visible: "Meus exames e consultas"
+    timeout: 20000

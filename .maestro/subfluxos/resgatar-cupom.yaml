@@ -1,0 +1,21 @@
+# Resgata o cupom do produto pela tela e confere o diálogo e o novo saldo. Começa na Início e termina no diálogo de
+# sucesso ("Cupom resgatado!"). Precisa de output.saldoTexto e output.saldoDepoisTexto (scripts/api.js, ACAO saldo).
+appId: host.exp.exponent
+---
+- runFlow: abrir-produto.yaml
+- assertVisible: "Seu saldo: ${output.saldoTexto}"
+# O cupom vem antes da promoção: o "Resgatar" dele é o que fica acima do título "Promoção"
+- tapOn:
+    text: "Resgatar"
+    above: "Promoção"
+- extendedWaitUntil:
+    visible: "Resgatar cupom\\?"
+    timeout: 5000
+- assertVisible: "Saldo depois do resgate"
+- assertVisible: ${output.saldoDepoisTexto}
+- tapOn: "Confirmar resgate"
+- extendedWaitUntil:
+    visible: "Cupom resgatado!"
+    timeout: 15000
+- assertVisible: "Novo saldo"
+- assertVisible: ${output.saldoDepoisTexto}

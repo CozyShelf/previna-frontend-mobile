@@ -1,0 +1,21 @@
+# Resgata a promoção do produto pela tela. Começa na Início e termina no detalhe do produto, com o diálogo fechado e o
+# botão da promoção como "Já resgatada".
+appId: host.exp.exponent
+---
+- runFlow: abrir-produto.yaml
+- scrollUntilVisible:
+    element: ${PROMOCAO_TITULO}
+- tapOn:
+    text: "Resgatar"
+    below: ${PROMOCAO_TITULO}
+- extendedWaitUntil:
+    visible: "Resgatar promoção\\?"
+    timeout: 5000
+- assertVisible: "Grátis"
+- tapOn: "Confirmar resgate"
+- extendedWaitUntil:
+    visible: "Promoção resgatada!"
+    timeout: 15000
+- assertVisible: "Grátis: seus pontos continuam os mesmos."
+- tapOn: "Concluir"
+- assertVisible: "Já resgatada"

@@ -1,0 +1,23 @@
+# Fluxo 6: Início → Ver histórico mostra, na seção "Concluídos", o exame que o médico confirmou na preparação.
+appId: host.exp.exponent
+name: 06 Histórico
+tags:
+  - e2e
+---
+- runFlow: subfluxos/login.yaml
+- scrollUntilVisible:
+    element: "Ver histórico"
+- tapOn: "Ver histórico"
+- extendedWaitUntil:
+    visible: "Histórico de exames e consultas"
+    timeout: 10000
+# O título da seção leva a quantidade: "Concluídos (1)"
+- scrollUntilVisible:
+    element: "Concluídos \\(\\d+\\)"
+- scrollUntilVisible:
+    element:
+      text: ${EXAME_NOME}
+      below: "Concluídos \\(\\d+\\)"
+- assertVisible:
+    text: "Realizado"
+    below: "Concluídos \\(\\d+\\)"

@@ -1,0 +1,35 @@
+# Fluxo 3: Cupons → Loja → busca a empresa → produto → resgata o cupom → detalhe com o código (lido da API) e o botão
+# de copiar → de volta ao produto, o saldo caiu. Pode ser repetido enquanto o saldo pagar o cupom.
+appId: host.exp.exponent
+name: 03 Resgate de cupom
+tags:
+  - e2e
+---
+- runFlow: subfluxos/login.yaml
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: saldo
+- runFlow: subfluxos/resgatar-cupom.yaml
+- tapOn: "Ver código"
+- extendedWaitUntil:
+    visible: "Mostre no caixa da ${EMPRESA_NOME}"
+    timeout: 15000
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: resgates
+- assertVisible: "Código: ${output.codigoCupomSoletrado}"
+- assertVisible: "QR Code do código, para a loja ler"
+# O botão diz "Código copiado" por só 2 segundos: o toque não espera a tela assentar (por padrão o Maestro espera até a
+# tela parar de mudar, e aí o texto já voltou para "Copiar")
+- tapOn:
+    text: "Copiar"
+    waitToSettleTimeoutMs: 200
+- assertVisible: "Código copiado"
+- scrollUntilVisible:
+    element: "Voltar"
+- tapOn: "Voltar"
+- extendedWaitUntil:
+    visible: "Seu saldo: ${output.saldoDepoisTexto}"
+    timeout: 15000

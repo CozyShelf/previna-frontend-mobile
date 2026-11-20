@@ -1,0 +1,10 @@
+# Com o login e a senha marcados para o preenchimento automático (autoComplete), o Android oferece salvar a senha no
+# Google Password Manager quando a tela de login sai. A oferta é de outro app (não fecha com o Expo Go), cobre o
+# Previna e é recusada aqui, se estiver na tela ("Not now" da primeira vez, "Never" das seguintes).
+appId: host.exp.exponent
+---
+- runFlow:
+    when:
+      visible: "Not now|Never|Agora não|Nunca"
+    commands:
+      - tapOn: "Not now|Never|Agora não|Nunca"
