@@ -303,7 +303,6 @@ async function main() {
     API_URL: APP_API_URL,
     GESTANTE_LOGIN: gestanteLogin,
     GESTANTE_SENHA: SENHA,
-    GESTANTE_NOME: gestanteNome,
     EMPRESA_NOME: empresaNome,
     EMPRESA_LOGIN: empresaLogin,
     EMPRESA_SENHA: SENHA,
@@ -311,7 +310,6 @@ async function main() {
     PROMOCAO_TITULO: promocaoTitulo,
     EXAME_NOME: exame.nome,
     CUPOM_PONTOS: String(custo),
-    SALDO_INICIAL: String(saldo),
   };
 
   const linhas = Object.entries(variaveis).map(([chave, valor]) => `${chave}=${valor}`);
