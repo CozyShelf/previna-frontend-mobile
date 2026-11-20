@@ -56,7 +56,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "test:coverage": "jest --coverage --ci"
+    "test:coverage": "jest --coverage --ci",
+    "e2e:preparar": "node e2e/preparar.mjs"
   },
   "private": true,
   "jest": {
