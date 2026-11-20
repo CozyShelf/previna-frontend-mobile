@@ -1,0 +1,82 @@
+# Fluxo 5: a aba superior "Cupons resgatados" lista o cupom e a promoção resgatados, o filtro por tipo separa os dois
+# e o detalhe de cada um mostra o código (lido da API). Se os fluxos 3 e 4 não rodaram, resgata antes o que faltar.
+appId: host.exp.exponent
+name: 05 Cupons resgatados
+tags:
+  - e2e
+---
+- runFlow: subfluxos/login.yaml
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: resgates
+- runFlow:
+    when:
+      true: ${!output.temCupom}
+    commands:
+      - runScript:
+          file: scripts/api.js
+          env:
+            ACAO: saldo
+      - runFlow: subfluxos/resgatar-cupom.yaml
+      - tapOn: "Concluir"
+      - runFlow: subfluxos/abrir-app.yaml
+- runFlow:
+    when:
+      true: ${!output.temPromocao}
+    commands:
+      - runFlow: subfluxos/resgatar-promocao.yaml
+      - runFlow: subfluxos/abrir-app.yaml
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: resgates
+- runFlow: subfluxos/abrir-resgatados.yaml
+
+# Os dois na lista
+- scrollUntilVisible:
+    element: "Cupom: 10% de desconto em ${PRODUTO_NOME}.*"
+- scrollUntilVisible:
+    element: "Promoção: ${PROMOCAO_TITULO}.*"
+
+# Só cupons
+- runFlow:
+    file: subfluxos/filtrar-tipo.yaml
+    env:
+      TIPO: "Cupom"
+- scrollUntilVisible:
+    element: "Cupom: 10% de desconto em ${PRODUTO_NOME}.*"
+- assertNotVisible: "Promoção: ${PROMOCAO_TITULO}.*"
+# Com mais de um cupom (fluxo repetido), abre o primeiro da lista, que é também o primeiro da API: os ativos vêm antes
+# e, entre eles, o resgate mais recente
+- tapOn: "Ver código: 10% de desconto em ${PRODUTO_NOME}"
+- extendedWaitUntil:
+    visible: "Mostre no caixa da ${EMPRESA_NOME}|Este cupom já foi usado na loja e não vale mais."
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Código.*: ${output.codigoCupomSoletrado}"
+    direction: DOWN
+- scrollUntilVisible:
+    element: "Voltar"
+- tapOn: "Voltar"
+
+# Só promoções (desmarca Cupom e marca Promoção)
+- runFlow:
+    file: subfluxos/filtrar-tipo.yaml
+    env:
+      TIPO: "Cupom"
+- runFlow:
+    file: subfluxos/filtrar-tipo.yaml
+    env:
+      TIPO: "Promoção"
+- scrollUntilVisible:
+    element: "Promoção: ${PROMOCAO_TITULO}.*"
+- assertNotVisible: "Cupom: 10% de desconto em ${PRODUTO_NOME}.*"
+- tapOn: "Ver código: ${PROMOCAO_TITULO}"
+- extendedWaitUntil:
+    visible: "Mostre no caixa da ${EMPRESA_NOME}|Esta promoção já foi usada na loja e não vale mais."
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Código.*: ${output.codigoPromocaoSoletrado}"
+- scrollUntilVisible:
+    element: "Promoção grátis: você não gastou pontos para resgatar."

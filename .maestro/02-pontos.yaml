@@ -1,0 +1,34 @@
+# Fluxo 2: a aba Pontos mostra o saldo creditado pelo exame confirmado. Depois o saldo muda por fora do app (um cupom
+# resgatado pela API) e puxar a tela para baixo mostra o saldo novo.
+appId: host.exp.exponent
+name: 02 Pontos
+tags:
+  - e2e
+---
+- runFlow: subfluxos/login.yaml
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: saldo
+- tapOn: "Pontos"
+- extendedWaitUntil:
+    visible: "Minha pontuação"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "Saldo: ${output.saldoTexto}"
+    timeout: 15000
+- assertVisible: "Consultas e exames que geraram pontos"
+- assertVisible: ${EXAME_NOME}
+# Gasta pontos fora do app: a tela ainda mostra o saldo antigo até recarregar
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: resgatarCupom
+- assertNotVisible: "Saldo: ${output.saldoTexto}"
+- swipe:
+    start: "50%, 25%"
+    end: "50%, 75%"
+    duration: 800
+- extendedWaitUntil:
+    visible: "Saldo: ${output.saldoTexto}"
+    timeout: 15000

@@ -1,0 +1,19 @@
+# Toca no campo de rótulo CAMPO e digita TEXTO. Cada campo tem o rótulo visível e o mesmo texto como rótulo acessível
+# do campo: o segundo (de cima para baixo) é o campo.
+# No emulador, o toque do Maestro pode abrir o tutorial de caneta do Gboard ("Try out your stylus") por cima do app: se
+# ele aparecer, é fechado e o toque repetido.
+appId: host.exp.exponent
+---
+- tapOn:
+    text: ${CAMPO}
+    index: 1
+- runFlow:
+    when:
+      visible: "Try out your stylus"
+    commands:
+      - tapOn: "Cancel"
+      - tapOn:
+          text: ${CAMPO}
+          index: 1
+- inputText: ${TEXTO}
+- hideKeyboard

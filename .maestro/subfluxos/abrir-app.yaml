@@ -1,0 +1,21 @@
+# Abre o Previna do zero no Expo Go: fecha o Expo Go e abre o projeto pelo link do Metro (APP_URL).
+# Termina na tela de login ou, com a sessão lembrada no aparelho, na Início.
+appId: host.exp.exponent
+---
+# Fecha e abre o Expo Go e só manda o link quando a tela inicial dele estiver pronta: o link enviado com o Expo Go
+# ainda abrindo (ou morrendo, logo depois de um stopApp) era ignorado
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Development servers|Recent history|Entrar no Previna|Meus exames e consultas"
+    timeout: 30000
+- openLink: ${APP_URL}
+# O primeiro carregamento do bundle pode demorar
+- extendedWaitUntil:
+    visible: "Entrar no Previna|Meus exames e consultas|Not now|Never|Agora não|Nunca"
+    timeout: 90000
+# A oferta de salvar a senha de um login anterior pode ter ficado aberta
+- runFlow: recusar-salvar-senha.yaml
+- extendedWaitUntil:
+    visible: "Entrar no Previna|Meus exames e consultas"
+    timeout: 90000

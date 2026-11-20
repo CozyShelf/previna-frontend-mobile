@@ -1,0 +1,11 @@
+# Marca ou desmarca uma opção do filtro Tipo nos Cupons resgatados (TIPO: "Cupom" ou "Promoção"). A opção fica entre
+# os rótulos "Tipo" e "Status", o que a separa do selo de mesmo texto nos cartões.
+appId: host.exp.exponent
+---
+- scrollUntilVisible:
+    element: "Tipo"
+    direction: UP
+- tapOn:
+    text: ${TIPO}
+    below: "Tipo"
+    above: "Status"

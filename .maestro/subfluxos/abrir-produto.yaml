@@ -1,0 +1,21 @@
+# Da Início até o detalhe do produto da preparação: Cupons → Loja Cupons → busca pela empresa → produto.
+appId: host.exp.exponent
+---
+- tapOn: "Cupons"
+- extendedWaitUntil:
+    visible: "Loja Cupons"
+    timeout: 10000
+- runFlow:
+    file: digitar.yaml
+    env:
+      CAMPO: "Buscar"
+      TEXTO: ${EMPRESA_NOME}
+# A busca espera a digitação parar e vai à API; o cartão do produto fica abaixo dos filtros. O rótulo acessível do
+# cartão começa pelo nome do produto e segue com as ofertas
+- scrollUntilVisible:
+    element: "${PRODUTO_NOME}, .*"
+    timeout: 20000
+- tapOn: "${PRODUTO_NOME}, .*"
+- extendedWaitUntil:
+    visible: "Vendido por ${EMPRESA_NOME}"
+    timeout: 15000

@@ -1,0 +1,14 @@
+# Configuração do Maestro para esta pasta: só os fluxos da raiz são testes (subfluxos/ e scripts/ são peças deles),
+# na ordem numérica. Os dados vêm do npm run e2e:preparar (ver o README, "Testes de ponta a ponta (Maestro)").
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - 01 Login
+    - 02 Pontos
+    - 03 Resgate de cupom
+    - 04 Promoção
+    - 05 Cupons resgatados
+    - 06 Histórico
+    - 07 Validação na loja

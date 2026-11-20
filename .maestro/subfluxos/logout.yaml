@@ -1,0 +1,10 @@
+# Sai da conta pela aba Perfil e volta para a tela de login.
+appId: host.exp.exponent
+---
+- tapOn: "Perfil"
+- scrollUntilVisible:
+    element: "Sair"
+- tapOn: "Sair"
+- extendedWaitUntil:
+    visible: "Entrar no Previna"
+    timeout: 10000

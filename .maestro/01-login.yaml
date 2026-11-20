@@ -1,0 +1,13 @@
+# Fluxo 1: entra com a gestante da preparação e vê a Início. Depois fecha e reabre o app: a sessão foi lembrada no
+# aparelho e o app volta direto para a Início.
+appId: host.exp.exponent
+name: 01 Login
+tags:
+  - e2e
+---
+- runFlow: subfluxos/login.yaml
+- assertVisible: "Meus exames e consultas"
+- assertVisible: "Ver histórico"
+- assertVisible: "Para você"
+- runFlow: subfluxos/abrir-app.yaml
+- assertVisible: "Meus exames e consultas"

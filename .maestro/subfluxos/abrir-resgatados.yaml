@@ -1,0 +1,16 @@
+# Da Início até a aba superior "Cupons resgatados", com a busca pela empresa da preparação.
+appId: host.exp.exponent
+---
+- tapOn: "Cupons"
+- extendedWaitUntil:
+    visible: "Cupons resgatados"
+    timeout: 10000
+- tapOn: "Cupons resgatados"
+- extendedWaitUntil:
+    visible: "Status"
+    timeout: 10000
+- runFlow:
+    file: digitar.yaml
+    env:
+      CAMPO: "Buscar"
+      TEXTO: ${EMPRESA_NOME}

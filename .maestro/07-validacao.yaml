@@ -1,0 +1,52 @@
+# Fluxo 7: a empresa valida pela API os cupons ativos da gestante (o código vem de GET /gestantes/cupons, não da
+# tela) e, de volta ao app, puxar para baixo em "Cupons resgatados" mostra o cupom como Utilizado. Se não houver
+# cupom ativo (fluxo já rodado), resgata um antes.
+appId: host.exp.exponent
+name: 07 Validação na loja
+tags:
+  - e2e
+---
+- runFlow: subfluxos/login.yaml
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: resgates
+- runFlow:
+    when:
+      true: ${!output.temCupomAtivo}
+    commands:
+      - runScript:
+          file: scripts/api.js
+          env:
+            ACAO: saldo
+      - runFlow: subfluxos/resgatar-cupom.yaml
+      - tapOn: "Concluir"
+      - runFlow: subfluxos/abrir-app.yaml
+- runFlow: subfluxos/abrir-resgatados.yaml
+- runFlow:
+    file: subfluxos/filtrar-tipo.yaml
+    env:
+      TIPO: "Cupom"
+- scrollUntilVisible:
+    element: "Cupom: 10% de desconto em ${PRODUTO_NOME}, ${EMPRESA_NOME}, Ativo, .*"
+
+- runScript:
+    file: scripts/api.js
+    env:
+      ACAO: validarCupons
+
+# A tela ainda mostra o que carregou antes da validação; puxar para baixo (com a lista no topo) busca de novo
+- scrollUntilVisible:
+    element: "Loja Cupons"
+    direction: UP
+- swipe:
+    start: "50%, 25%"
+    end: "50%, 75%"
+    duration: 800
+- scrollUntilVisible:
+    element: "Cupom: 10% de desconto em ${PRODUTO_NOME}, ${EMPRESA_NOME}, Utilizado, .*"
+- assertNotVisible: "Cupom: 10% de desconto em ${PRODUTO_NOME}, ${EMPRESA_NOME}, Ativo, .*"
+- tapOn: "Ver código: 10% de desconto em ${PRODUTO_NOME}"
+- extendedWaitUntil:
+    visible: "Este cupom já foi usado na loja e não vale mais."
+    timeout: 15000
