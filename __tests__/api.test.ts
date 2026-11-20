@@ -34,9 +34,9 @@ beforeEach(() => {
 
 describe('cabeçalhos', () => {
   it('sem sessão não manda Authorization', async () => {
-    await get('/cupons/disponiveis');
+    await get('/ofertas');
 
-    expect(mockFetch).toHaveBeenCalledWith(`${API_URL}/cupons/disponiveis`, expect.any(Object));
+    expect(mockFetch).toHaveBeenCalledWith(`${API_URL}/ofertas`, expect.any(Object));
     expect(cabecalhosEnviados()).toEqual({ 'Content-Type': 'application/json' });
   });
 
