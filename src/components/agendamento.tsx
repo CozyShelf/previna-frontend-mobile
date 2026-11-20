@@ -29,6 +29,26 @@ const formatarData = (data: string) => data.split('-').reverse().join('/');
 // A separação deixou de ser por data: pendente é o que o médico ainda não resolveu, mesmo com a data
 // já passada. O backend separa e ordena (/gestantes/agendamentos?pendentes=true|false).
 
+export interface AgendamentosSeparados {
+  pendentes: Agendamento[];
+  concluidos: Agendamento[];
+}
+
+// Para a lista completa (/gestantes/agendamentos, sem o filtro): o backend já manda os pendentes primeiro,
+// da data prevista mais próxima para a mais distante, e essa ordem é mantida. Os concluídos chegam por status
+// e data prevista, então são reordenados como no filtro do histórico: do desfecho mais recente para o mais
+// antigo (dataConfirmacao é ISO, então a comparação de texto segue a do tempo), e pelo id no empate.
+export function separarAgendamentos(agendamentos: Agendamento[]): AgendamentosSeparados {
+  const pendentes = agendamentos.filter((a) => a.status === 'AGENDADO');
+  const concluidos = agendamentos
+    .filter((a) => a.status !== 'AGENDADO')
+    .sort(
+      (a, b) =>
+        (b.dataConfirmacao ?? '').localeCompare(a.dataConfirmacao ?? '') || b.id - a.id,
+    );
+  return { pendentes, concluidos };
+}
+
 export interface CartaoAgendamentoProps {
   agendamento: Agendamento;
 }
@@ -56,12 +76,21 @@ export interface SecaoAgendamentosProps {
   agendamentos: Agendamento[];
   // Quantos existem ao todo, quando a tela mostra só uma parte (a home mostra os primeiros pendentes)
   total?: number;
+  // Com o texto, a seção vazia aparece com o título e a explicação, para a gestante saber que ela existe
+  vazio?: string;
 }
 
-// Seção vazia não aparece: a gestante só vê o que ela tem
-export function SecaoAgendamentos({ titulo, agendamentos, total }: SecaoAgendamentosProps) {
+// Seção vazia não aparece, a não ser que a tela explique por que está vazia
+export function SecaoAgendamentos({ titulo, agendamentos, total, vazio }: SecaoAgendamentosProps) {
   if (agendamentos.length === 0) {
-    return null;
+    return vazio ? (
+      <View style={styles.secao}>
+        <Text style={styles.secaoTitulo} accessibilityRole="header">
+          {titulo}
+        </Text>
+        <Text style={styles.aviso}>{vazio}</Text>
+      </View>
+    ) : null;
   }
 
   return (
@@ -119,6 +148,12 @@ const styles = StyleSheet.create({
   observacao: {
     fontFamily: Fontes.regular,
     fontSize: 14,
+    color: Cores.textoSecundario,
+  },
+  aviso: {
+    fontFamily: Fontes.regular,
+    fontSize: 15,
+    lineHeight: 22,
     color: Cores.textoSecundario,
   },
 });
