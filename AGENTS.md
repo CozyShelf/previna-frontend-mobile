@@ -1,3 +1,68 @@
+# AGENTS.md — previna-frontend-mobile
+
+Guia para agentes de IA (Codex, opencode, Cursor, Gemini, Claude Code). Curto de propósito: os detalhes estão no
+`README.md` e em `doc/`. A segunda metade deste arquivo é o bloco gerado pelo Expo: mantenha-o intacto.
+
+## O que é
+
+App da gestante no Previna (Expo SDK 58, React Native 0.88, TypeScript, Expo Router): exames e consultas, pontos,
+loja de cupons e promoções, cupons resgatados e perfil. A API é o `previna-backend`. Telas: tabela do `README.md`.
+
+## Comandos do projeto
+
+```bash
+npm install
+EXPO_PUBLIC_API_URL=http://<ip-da-maquina>/backend npx expo start   # ou a pilha completa no previna-development
+npm run lint && npx tsc --noEmit
+npm test                 # Jest (jest-expo) + Testing Library
+npm run test:coverage    # o que a CI roda, com os pisos de cobertura
+npm run e2e:preparar     # dados dos E2E do Maestro (exige a pilha de dev no ar)
+```
+
+## Regras obrigatórias
+
+- Código, textos e commits em português. Alias `@/` → `src/`.
+- Dependência nova só com `npx expo install <pacote>`.
+- Rotas só em `src/app/`; abas da gestante logada em `src/app/(abas)/`. Componentes, libs e constantes fora.
+- Toda chamada HTTP passa por `src/lib/api.ts`; a sessão (token) só por `src/lib/sessao.ts` (SecureStore).
+- Erros da API: decida pelo `codigo`, nunca pelo texto de `message`.
+- Resgates mandam `Idempotency-Key` nova a cada confirmação (`src/lib/idempotencia.ts`).
+- Testes em `__tests__/` (fora de `src/app`, senão viram telas); cada arquivo começa com
+  `/// <reference types="jest" />`. Na Testing Library v14, `render` e `fireEvent` são assíncronos: use `await`.
+- E2E do Maestro em `.maestro/`; `subfluxos/` não são testes. Os dados são marcados `E2E <carimbo>` e gravam no
+  banco de dev; `.maestro/.env.local` fica fora do git.
+- Cobertura subiu: suba os pisos de `jest.coverageThreshold` no `package.json`.
+- Branches de trabalho partem da `development` e voltam por PR, no padrão Conventional Commits.
+
+## Definição de pronto
+
+O que `.github/workflows/ci.yml` roda, todos verdes: `npm ci`, `npx expo lint`, `npx tsc --noEmit` e
+`npm run test:coverage`. Mudou tela, script ou fluxo: atualize o `README.md` e, se for o caso,
+`doc/roteiro-ponta-a-ponta.md`.
+
+## Memória do projeto
+
+- **Decisões** que ainda não viraram código (ou cujo porquê não cabe no código) vão para `doc/decisoes/`, um
+  arquivo por decisão, `AAAA-MM-DD-assunto.md`, no modelo de `doc/decisoes/README.md`.
+- **Troca de agente:** antes de parar no meio de uma tarefa, escreva `HANDOFF.md` na raiz com estado, decisões
+  tomadas, próximos passos e dúvidas abertas. O próximo agente o lê antes de começar e o atualiza ou apaga ao
+  terminar. O arquivo está no `.gitignore`: é passagem de bastão, não documentação.
+- Conhecimento durável (comandos, armadilhas, regras) vai para este arquivo ou para `doc/`, versionado, e não
+  só na memória privada de uma ferramenta.
+
+## Índice
+
+| Caminho | Conteúdo |
+| --- | --- |
+| `README.md` | Telas, como rodar, scripts, estrutura, testes, E2E com Maestro (pré-requisitos, contornos do emulador) e CI |
+| `doc/roteiro-ponta-a-ponta.md` | Roteiro de ponta a ponta: o que o Maestro cobre e o que falta conferir à mão |
+| `doc/decisoes/` | Registro de decisões (modelo no README da pasta) |
+| `../previna-backend/docs/README.md` | Regras de negócio da API e tabela de códigos de erro |
+
+---
+
+<!-- Bloco abaixo gerado pelo create-expo-app: mantenha intacto. -->
+
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
 ## Expo has changed — do not trust your training data

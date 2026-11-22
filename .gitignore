@@ -44,3 +44,6 @@ example
 
 # Relatório de cobertura dos testes (npm run test:coverage)
 coverage/
+
+# Passagem de bastão entre agentes de IA (ver AGENTS.md)
+HANDOFF.md
