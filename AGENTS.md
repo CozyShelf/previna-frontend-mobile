@@ -33,6 +33,8 @@ npm run e2e:preparar     # dados dos E2E do Maestro (exige a pilha de dev no ar)
   banco de dev; `.maestro/.env.local` fica fora do git.
 - Cobertura subiu: suba os pisos de `jest.coverageThreshold` no `package.json`.
 - Branches de trabalho partem da `development` e voltam por PR, no padrão Conventional Commits.
+- A `development` só sobe para a `main` quando um módulo inteiro termina (ex.: o módulo de cupons). O deploy é feito
+  depois, a partir da `main`. Não abra PR para a `main` no meio de um módulo.
 
 ## Definição de pronto
 
